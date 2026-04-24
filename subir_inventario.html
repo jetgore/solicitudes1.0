@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subir Inventario → Firebase</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0f1117;--surface:#181c27;--surface2:#1e2335;
+  --border:#2a3050;--border-bright:#3d4f7c;
+  --accent:#4f8ef7;--accent-dim:#1e3a6e;
+  --success:#2dd4a0;--success-dim:#0d3d2d;
+  --warning:#f7c84f;--warning-dim:#3d3010;
+  --danger:#f75f5f;--danger-dim:#3d1010;
+  --text:#e8ecf5;--text-muted:#7a8ab0;--text-dim:#4a5578;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --r:5px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;display:flex;flex-direction:column;align-items:center;padding:40px 16px}
+h1{font-family:var(--mono);font-size:14px;color:var(--accent);letter-spacing:.08em;margin-bottom:6px}
+.sub{font-size:12px;color:var(--text-muted);margin-bottom:32px;font-family:var(--mono)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;width:100%;max-width:680px;margin-bottom:16px}
+.card-title{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:.12em;text-transform:uppercase;margin-bottom:16px}
+
+.sf-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.sf-field label{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:.1em;text-transform:uppercase}
+.sf-field input{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 10px;outline:none;transition:border-color .15s}
+.sf-field input:focus{border-color:var(--accent)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+.drop-zone{border:2px dashed var(--border-bright);border-radius:var(--r);padding:32px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:16px;color:var(--text-muted);font-size:13px}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:var(--accent-dim);color:var(--text)}
+.drop-zone input{display:none}
+.drop-icon{font-size:28px;margin-bottom:8px;color:var(--accent)}
+
+.preview-table{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono);margin-top:12px}
+.preview-table th{text-align:left;padding:6px 10px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text-dim);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.preview-table td{padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text)}
+.preview-table tr:last-child td{border-bottom:none}
+.preview-table td:first-child{color:var(--accent)}
+.scroll-wrap{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r)}
+
+.btn{padding:9px 18px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s;font-family:var(--sans)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#6fa3fa}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--text-muted);border-color:var(--border)}
+.btn-ghost:hover{border-color:var(--border-bright);color:var(--text)}
+
+.actions{display:flex;gap:10px;align-items:center;margin-top:16px}
+
+.prog-wrap{margin-top:14px;display:none}
+.prog-bg{background:var(--border);border-radius:4px;height:5px;overflow:hidden;margin-top:6px}
+.prog-bar{background:var(--accent);height:100%;width:0%;transition:width .15s}
+.prog-text{font-family:var(--mono);font-size:12px;color:var(--text-muted)}
+
+.log{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:12px;font-family:var(--mono);font-size:12px;color:var(--text-muted);max-height:200px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;margin-top:12px;display:none}
+.log.visible{display:block}
+
+.status-row{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--text-muted);margin-bottom:8px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text-dim);flex-shrink:0}
+.dot.ok{background:var(--success);box-shadow:0 0 5px var(--success)}
+.dot.err{background:var(--danger)}
+
+.stat{background:var(--surface2);border-radius:var(--r);padding:6px 12px;font-family:var(--mono);font-size:12px;color:var(--text-muted);display:inline-flex;gap:6px;align-items:center}
+.stat span{color:var(--success);font-size:14px;font-weight:600}
+
+.col-map{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.col-map label{font-size:12px;color:var(--text-muted)}
+.col-map select{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:12px;padding:6px 8px;outline:none;width:100%}
+.col-map select:focus{border-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>INVENTARIO / CARGA MASIVA</h1>
+<p class="sub">Sube tu Excel a la colección <code style="background:var(--surface);padding:2px 6px;border-radius:3px;border:1px solid var(--border);color:var(--warning)">'inventario'</code> en Firebase</p>
+
+<!-- STEP 1: Firebase config -->
+<div class="card">
+  <div class="card-title">① Credenciales Firebase</div>
+  <div class="status-row"><div class="dot" id="fbDot"></div><span id="fbStatus">Sin conectar</span></div>
+  <div class="grid2">
+    <div class="sf-field"><label>API Key</label><input id="apiKey" placeholder="AIzaSy..."></div>
+    <div class="sf-field"><label>Auth Domain</label><input id="authDomain" placeholder="proyecto.firebaseapp.com"></div>
+    <div class="sf-field"><label>Project ID</label><input id="projectId" placeholder="mi-proyecto"></div>
+    <div class="sf-field"><label>App ID</label><input id="appId" placeholder="1:123:web:abc..."></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:4px">
+    <button class="btn btn-primary" id="btnConectar">Conectar</button>
+    <button class="btn btn-ghost" id="btnCargarConfig">Cargar config guardada</button>
+  </div>
+</div>
+
+<!-- STEP 2: Excel -->
+<div class="card">
+  <div class="card-title">② Selecciona tu archivo Excel</div>
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    <div class="drop-icon">⬆</div>
+    <div>Arrastra tu Excel aquí o <strong style="color:var(--accent)">haz clic para buscar</strong></div>
+    <div style="font-size:11px;margin-top:6px;color:var(--text-dim)">Soporta .xlsx · .xls · .csv</div>
+  </div>
+
+  <div id="colMapWrap" style="display:none">
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Mapea las columnas de tu archivo:</p>
+    <div class="col-map">
+      <div>
+        <label>Columna → ID / Código</label>
+        <select id="colId"></select>
+      </div>
+      <div>
+        <label>Columna → Descripcion</label>
+        <select id="colDesc"></select>
+      </div>
+    </div>
+    <button class="btn btn-ghost" id="btnActualizarPreview" style="margin-top:10px;font-size:12px;padding:6px 12px">Actualizar vista previa</button>
+  </div>
+
+  <div id="previewWrap" style="display:none;margin-top:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="stat">Filas detectadas: <span id="totalRows">0</span></div>
+      <span style="font-size:11px;color:var(--text-dim)">Vista previa (primeras 10 filas)</span>
+    </div>
+    <div class="scroll-wrap">
+      <table class="preview-table">
+        <thead><tr><th>ID / Código</th><th>Descripcion</th></tr></thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3: Upload -->
+<div class="card">
+  <div class="card-title">③ Subir a Firebase</div>
+  <div style="font-size:12px;color:var(--text-muted);line-height:1.7;margin-bottom:14px">
+    Sube todos los registros a la colección <code style="background:var(--bg);padding:2px 5px;border-radius:3px;border:1px solid var(--border);color:var(--warning)">inventario</code>.<br>
+    <strong style="color:var(--warning-dim);font-weight:500">⚠ Modo reemplazo:</strong> borra el inventario existente antes de subir el nuevo.
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" id="btnSubir" disabled>Subir inventario</button>
+    <button class="btn btn-ghost" id="btnSoloAgregar" disabled>Solo agregar (sin borrar)</button>
+  </div>
+  <div class="prog-wrap" id="progWrap">
+    <div class="prog-text">Subiendo: <span id="progText">0/0</span></div>
+    <div class="prog-bg"><div class="prog-bar" id="progBar"></div></div>
+  </div>
+  <div class="log" id="uploadLog"></div>
+</div>
+
+<script type="module">
+import { initializeApp, getApps, getApp }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  getFirestore, collection, addDoc, getDocs,
+  deleteDoc, doc, writeBatch
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const CFG_KEY = 'fb_sol_v3';
+const INV_COL = 'inventario';
+
+let db = null;
+let parsedData = [];
+let headers    = [];
+
+// ── Cargar config guardada ──────────────────────────────────────────────────
+function cargarCfgGuardada() {
+  try { return JSON.parse(localStorage.getItem(CFG_KEY)); } catch(e) { return null; }
+}
+
+document.getElementById('btnCargarConfig').addEventListener('click', () => {
+  const c = cargarCfgGuardada();
+  if (!c) { alert('No hay configuración guardada. Ingresa los datos manualmente.'); return; }
+  document.getElementById('apiKey').value     = c.apiKey     || '';
+  document.getElementById('authDomain').value = c.authDomain || '';
+  document.getElementById('projectId').value  = c.projectId  || '';
+  document.getElementById('appId').value      = c.appId      || '';
+  log('Config cargada desde almacenamiento local');
+});
+
+// ── Conectar Firebase ───────────────────────────────────────────────────────
+document.getElementById('btnConectar').addEventListener('click', async () => {
+  const cfg = {
+    apiKey:     document.getElementById('apiKey').value.trim(),
+    authDomain: document.getElementById('authDomain').value.trim(),
+    projectId:  document.getElementById('projectId').value.trim(),
+    appId:      document.getElementById('appId').value.trim(),
+  };
+  if (!cfg.apiKey || !cfg.projectId) { alert('Completa al menos API Key y Project ID'); return; }
+  try {
+    const app = getApps().length ? getApp() : initializeApp(cfg);
+    db = getFirestore(app);
+    // Test rápido
+    await getDocs(collection(db, '_ping_test_'));
+    setFbStatus(true, 'Conectado a ' + cfg.projectId);
+  } catch(e) {
+    if (e.code === 'permission-denied' || e.code?.includes('permission')) {
+      setFbStatus(true, 'Conectado (permisos normales)');
+    } else {
+      setFbStatus(false, 'Error: ' + e.message);
+    }
+  }
+  actualizarBotones();
+});
+
+function setFbStatus(ok, msg) {
+  document.getElementById('fbDot').className = 'dot ' + (ok ? 'ok' : 'err');
+  document.getElementById('fbStatus').textContent = msg;
+}
+
+// ── Drag & drop / file input ────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click',  () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) procesarArchivo(file);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) procesarArchivo(fileInput.files[0]);
+});
+
+function procesarArchivo(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, { type: 'binary' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (rows.length < 2) { alert('El archivo parece estar vacío'); return; }
+
+    headers = rows[0].map(h => String(h).trim());
+    const dataRows = rows.slice(1).filter(r => r.some(c => c !== ''));
+
+    // Auto-detectar columnas
+    const guessId   = headers.findIndex(h => /^id$|código|codigo|^id\s*\//i.test(h));
+    const guessDesc = headers.findIndex(h => /desc/i.test(h));
+
+    llenarSelectores(headers, guessId >= 0 ? guessId : 0, guessDesc >= 0 ? guessDesc : 1);
+    parsedData = dataRows;
+
+    document.getElementById('colMapWrap').style.display = 'block';
+    actualizarPreview();
+    actualizarBotones();
+    dropZone.querySelector('div:nth-child(2)').textContent = '📄 ' + file.name;
+  };
+  reader.readAsBinaryString(file);
+}
+
+function llenarSelectores(hdrs, idxId, idxDesc) {
+  const selId   = document.getElementById('colId');
+  const selDesc = document.getElementById('colDesc');
+  [selId, selDesc].forEach(sel => {
+    sel.innerHTML = hdrs.map((h, i) =>
+      `<option value="${i}">${h || '(columna ' + (i+1) + ')'}</option>`
+    ).join('');
+  });
+  selId.value   = idxId;
+  selDesc.value = idxDesc;
+}
+
+document.getElementById('btnActualizarPreview').addEventListener('click', actualizarPreview);
+
+function actualizarPreview() {
+  const idxId   = parseInt(document.getElementById('colId').value);
+  const idxDesc = parseInt(document.getElementById('colDesc').value);
+
+  const preview = parsedData.slice(0, 10);
+  const tbody   = document.getElementById('previewBody');
+  tbody.innerHTML = preview.map(r =>
+    `<tr><td>${esc(r[idxId])}</td><td>${esc(r[idxDesc])}</td></tr>`
+  ).join('');
+
+  document.getElementById('totalRows').textContent = parsedData.length;
+  document.getElementById('previewWrap').style.display = 'block';
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Subir ──────────────────────────────────────────────────────────────────
+async function subirDatos(borrarPrimero) {
+  if (!db)            { alert('Conecta Firebase primero'); return; }
+  if (!parsedData.length) { alert('Carga un archivo Excel primero'); return; }
+
+  const idxId   = parseInt(document.getElementById('colId').value);
+  const idxDesc = parseInt(document.getElementById('colDesc').value);
+
+  const registros = parsedData
+    .map(r => ({ ID: String(r[idxId]||'').trim(), Descripcion: String(r[idxDesc]||'').trim() }))
+    .filter(r => r.ID || r.Descripcion);
+
+  if (!registros.length) { alert('No hay datos válidos para subir'); return; }
+  if (!confirm(`¿${borrarPrimero ? 'Reemplazar el inventario completo' : 'Agregar'} con ${registros.length} registros?`)) return;
+
+  const pw  = document.getElementById('progWrap');
+  const pt  = document.getElementById('progText');
+  const pb  = document.getElementById('progBar');
+  pw.style.display = 'block';
+  document.getElementById('uploadLog').className = 'log visible';
+  appendLog('Iniciando...');
+
+  document.getElementById('btnSubir').disabled = true;
+  document.getElementById('btnSoloAgregar').disabled = true;
+
+  // Borrar existentes si corresponde
+  if (borrarPrimero) {
+    appendLog('Eliminando inventario anterior...');
+    try {
+      const snap = await getDocs(collection(db, INV_COL));
+      const batches = [];
+      let batch = null, count = 0;
+      for (const d of snap.docs) {
+        if (count % 500 === 0) { batch = writeBatch(db); batches.push(batch); }
+        batch.delete(doc(db, INV_COL, d.id));
+        count++;
+      }
+      for (const b of batches) await b.commit();
+      appendLog(`Eliminados ${snap.size} registros previos`);
+    } catch(e) {
+      appendLog('⚠ Error al eliminar: ' + e.message);
+    }
+  }
+
+  // Subir en batches de 500
+  let ok = 0, fail = 0;
+  const total = registros.length;
+  const BATCH_SIZE = 499;
+
+  for (let start = 0; start < total; start += BATCH_SIZE) {
+    const chunk = registros.slice(start, start + BATCH_SIZE);
+    const batch = writeBatch(db);
+    for (const r of chunk) {
+      const ref = doc(collection(db, INV_COL));
+      batch.set(ref, r);
+    }
+    try {
+      await batch.commit();
+      ok += chunk.length;
+    } catch(e) {
+      fail += chunk.length;
+      appendLog('⚠ Error en lote: ' + e.message);
+    }
+    pt.textContent = `${Math.min(start + BATCH_SIZE, total)}/${total}`;
+    pb.style.width = Math.round((Math.min(start + BATCH_SIZE, total) / total) * 100) + '%';
+  }
+
+  appendLog(`\n✓ Completado: ${ok} subidos${fail ? ', ' + fail + ' errores' : ''}`);
+  document.getElementById('btnSubir').disabled = false;
+  document.getElementById('btnSoloAgregar').disabled = false;
+}
+
+document.getElementById('btnSubir').addEventListener('click', () => subirDatos(true));
+document.getElementById('btnSoloAgregar').addEventListener('click', () => subirDatos(false));
+
+function actualizarBotones() {
+  const listo = db && parsedData.length > 0;
+  document.getElementById('btnSubir').disabled = !listo;
+  document.getElementById('btnSoloAgregar').disabled = !listo;
+}
+
+function appendLog(msg) {
+  const el = document.getElementById('uploadLog');
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+function log(msg) { appendLog(msg); }
+</script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión de Solicitudes</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════ LOGIN -->
+<div id="loginView">
+  <div class="login-box">
+    <h3>Gestión / Solicitudes</h3>
+    <div class="login-field">
+      <input type="email" id="loginEmail" placeholder="Correo electrónico" autocomplete="email">
+    </div>
+    <div class="login-field">
+      <input type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="loginBtn" disabled>Ingresar</button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-init" id="loginInit">Inicializando Firebase...</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ APP -->
+<div id="appShell" style="display:none">
+
+<div class="topbar">
+  <div class="topbar-logo">GESTION<span>/</span>SOLICITUDES</div>
+  <div class="topbar-right">
+    <div class="topbar-status">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">Conectando...</span>
+    </div>
+    <div class="topbar-user" id="topbarUser"></div>
+    <button class="btn btn-ghost" id="btnLogout" style="font-size:11px;padding:5px 10px">Salir</button>
+  </div>
+</div>
+
+//<div class="nav" id="mainNav">
+  <div class="nav-tab active" data-view="nueva">Nueva Solicitud</div>
+  <div class="nav-tab" data-view="registros">Registros <span class="cbadge" id="totalBadge">0</span></div>
+  <div class="nav-tab admin-only" data-view="importar" style="display:none">Importar TXT</div>
+  <div class="nav-tab admin-only" data-view="config" style="display:none">Configuración</div>
+//</div>
+
+<div class="main">
+
+<!-- ═══════════════════════════════════════════════════ NUEVA SOLICITUD -->
+<div class="view active" id="view-nueva">
+  <p class="sec-head">Nueva solicitud</p>
+
+  <div class="fblock">
+    <div class="frow half">
+      <label>solicitud:</label>
+      <input type="text" id="fSolicitud" placeholder="809976" autocomplete="off">
+    </div>
+    <div class="frow half">
+      <label>devolucion:</label>
+      <input type="text" id="fDevolucion" placeholder="DEV-001" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="fblock">
+    <div class="frow">
+      <label>Usuario:</label>
+      <input type="text" id="fUsuario" placeholder="Nombre completo" autocomplete="off">
+    </div>
+    <div class="frow">
+      <label>Direccion:</label>
+      <input type="text" id="fDireccion" placeholder="Dirección o Teletrabajo" autocomplete="off">
+    </div>
+    <div class="frow2">
+      <label>BCS:</label>
+      <input type="text" id="fBcs" placeholder="BCS-XXXXX" autocomplete="off">
+      <label class="sep">SCI:</label>
+      <input type="text" id="fSci" placeholder="SCTI-XXXXX" autocomplete="off">
+    </div>
+    <div class="frow">
+      <label>Observacion:</label>
+      <input type="text" id="fObs" placeholder="Ej: Permuta Notebook, Reposición..." autocomplete="off">
+    </div>
+  </div>
+
+  <div class="fblock">
+    <div class="fblock-title">Articulos</div>
+    <table class="art-table" id="artTable">
+      <thead>
+        <tr>
+          <th style="width:160px">ID / Código</th>
+          <th>Descripcion</th>
+          <th style="width:140px">Serial Number</th>
+          <th class="th-actions">
+            <button class="btn-add" id="btnAgregarArticulo">+ Agregar</button>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="artBody"></tbody>
+    </table>
+    <div style="padding:6px 10px;font-size:11px;color:var(--text-dim);font-style:italic;border-top:1px solid var(--border)">"Se deben ir agregando los items hacia abajo"</div>
+  </div>
+
+  <div class="fblock">
+    <div class="fblock-title">Devolucion</div>
+    <table class="art-table" id="devTable">
+      <thead>
+        <tr>
+          <th style="width:160px">ID / Código</th>
+          <th>Descripcion</th>
+          <th class="th-actions">
+            <button class="btn-add" id="btnAgregarDevuelve">+ Agregar</button>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="devBody"></tbody>
+    </table>
+  </div>
+
+  <div class="actions-bar">
+    <button class="btn btn-ghost" id="btnCopiar">Copiar</button>
+    <button class="btn btn-primary" id="btnGuardar">Guardar</button>
+    <button class="btn btn-ghost" id="btnLimpiar">Limpiar</button>
+    <span id="formMsg" class="actions-hint"></span>
+  </div>
+  <div style="padding-top:6px;font-size:11px;color:var(--text-dim);font-style:italic">"Guarda todos los datos en la DB"</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ REGISTROS -->
+<div class="view" id="view-registros">
+  <p class="sec-head">Registros guardados</p>
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Buscar por cualquier campo: solicitud, usuario, BCS, SCI, código, devuelve...">
+    <select id="filterField">
+      <option value="all">Todos los campos</option>
+      <option value="solicitud">N° Solicitud</option>
+      <option value="devolucion">N° Devolución</option>
+      <option value="usuario">Usuario</option>
+      <option value="bcs">BCS</option>
+      <option value="sci">SCI</option>
+      <option value="codigo">Código artículo</option>
+      <option value="serial">Serial Number</option>
+      <option value="observaciones">Observaciones</option>
+      <option value="devuelve">Devuelve</option>
+    </select>
+    <button class="btn btn-ghost" id="btnActualizar" style="font-size:12px;padding:7px 12px">&#8635; Actualizar</button>
+  </div>
+  <div id="regList"><div class="empty">Cargando registros...</div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ IMPORTAR -->
+<div class="view admin-only" id="view-importar" style="display:none">
+  <p class="sec-head">Importar historial desde TXT</p>
+  <div class="fblock">
+    <div style="padding:16px">
+      <p style="color:var(--text-muted);font-size:13px;line-height:1.7;margin-bottom:14px">
+        Carga tu archivo TXT. Registros separados por líneas de guiones (<code>--------</code>).
+        Reconoce: <code>OS</code> <code>solicitud</code> <code>usuario</code> <code>BCS</code> <code>SCI</code>
+        <code>devuelve</code> artículos con código <code>E-</code> y observaciones (texto libre).
+      </p>
+      <div class="sf-field" style="margin-bottom:14px;max-width:400px">
+        <label>Archivo TXT</label>
+        <input type="file" id="importFile" accept=".txt" style="font-family:var(--sans);font-size:13px;padding:7px">
+      </div>
+      <div id="importPreview" style="display:none">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;flex-wrap:wrap">
+          <span style="font-family:var(--mono);font-size:13px;color:var(--text-muted)">Detectados: <span id="importCount" style="color:var(--success);font-size:15px">0</span></span>
+          <button class="btn btn-ghost" id="btnToggleLog" style="font-size:11px;padding:5px 10px">Ver detalle</button>
+          <button class="btn btn-primary" id="btnImportar">Subir a Firebase</button>
+        </div>
+        <div class="import-log" id="importLog"></div>
+        <div class="prog-wrap" id="progWrap">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">Subiendo: <span id="progText">0/0</span></span>
+          <div class="prog-bg"><div class="prog-bar" id="progBar"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ CONFIG -->
+<div class="view admin-only" id="view-config" style="display:none">
+  <p class="sec-head">Credenciales Firebase</p>
+  <div class="fblock">
+    <div style="padding:16px">
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;line-height:1.7">
+        Ve a <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">Firebase Console</a>
+        &rarr; tu proyecto &rarr; Configuración &rarr; SDK web &rarr; pestaña <strong>Config</strong>.
+      </p>
+      <div class="setup-grid">
+        <div class="sf-field"><label>API Key</label><input type="text" id="cfgApiKey" placeholder="AIzaSy..."></div>
+        <div class="sf-field"><label>Auth Domain</label><input type="text" id="cfgAuthDomain" placeholder="proyecto.firebaseapp.com"></div>
+        <div class="sf-field"><label>Project ID</label><input type="text" id="cfgProjectId" placeholder="mi-proyecto"></div>
+        <div class="sf-field"><label>Storage Bucket</label><input type="text" id="cfgStorageBucket" placeholder="proyecto.appspot.com"></div>
+        <div class="sf-field"><label>Messaging Sender ID</label><input type="text" id="cfgSenderId" placeholder="123456789"></div>
+        <div class="sf-field"><label>App ID</label><input type="text" id="cfgAppId" placeholder="1:123:web:abc..."></div>
+      </div>
+      <div class="sf-field" style="margin-bottom:14px;max-width:240px">
+        <label>Colección Firestore</label>
+        <input type="text" id="cfgColeccion" value="solicitudes">
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" id="btnGuardarConfig">Guardar y conectar</button>
+        <button class="btn btn-ghost" id="btnProbarConfig">Probar conexión</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /appShell -->
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span id="toastIcon" style="font-size:14px">&#10003;</span>
+  <span id="toastMsg"></span>
+</div>
+
+<script type="module" src="script.js"></script>
+</body>
+</html>
+
