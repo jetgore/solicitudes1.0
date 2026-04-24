@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Sistema TI",
+  "version": "0.1.0",
+  "identifier": "cl.fraile.sistemati",
+  "build": {
+    "frontendDist": "../frontend",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devUrl": null
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Sistema TI",
+        "width": 1000,
+        "height": 700
+      }
+    ]
+  },
+"bundle": {
+  "active": true,
+  "targets": "all",
+  "icon": ["icons/icon.ico"]
+}
+}

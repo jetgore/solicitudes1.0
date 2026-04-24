@@ -38,7 +38,7 @@ let currentRole  = 'user';
 let registros    = [];
 let registrosFiltrados = [];
 let articulosData = [{codigo:'', descripcion:'', serial:''}];
-let devuelveData  = [{codigo:'', descripcion:''}];
+let devuelveData  = [{codigo:'', descripcion:'', serial:''}];
 let registrosParsed = [];
 let firebaseReady = false;
 let editandoId = null; // ID del registro en edición (null = modo creación)
@@ -246,6 +246,7 @@ function renderDevuelve() {
         </div>
       </td>
       <td><textarea placeholder="Descripción del equipo devuelto..." rows="1" data-field="descripcion" data-idx="${i}" data-tabla="dev" style="height:32px;overflow:hidden">${esc(row.descripcion)}</textarea></td>
+      <td><input type="text" placeholder="Serial Number" value="${esc(row.serial)}" data-field="serial" data-idx="${i}" data-tabla="dev" autocomplete="off"></td>
       <td class="td-actions">
         <button class="btn-rm" data-idx="${i}" data-tabla="dev" ${devuelveData.length === 1 ? 'disabled' : ''}>&times;</button>
       </td>
@@ -443,7 +444,7 @@ document.getElementById('btnAgregarArticulo').addEventListener('click', () => {
 document.getElementById('btnAgregarDevuelve').addEventListener('click', () => {
   const last = devuelveData[devuelveData.length - 1];
   if (!last.codigo && !last.descripcion) { toast('Completa el equipo antes de agregar otro', 'info'); return; }
-  devuelveData.push({codigo:'', descripcion:''});
+  devuelveData.push({codigo:'', descripcion:'', serial:''});
   renderDevuelve();
   setupAutocomplete('devBody', 'dev');
 });
@@ -456,7 +457,7 @@ function limpiarFormulario() {
     document.getElementById(id).value = '';
   });
   articulosData = [{codigo:'', descripcion:'', serial:''}];
-  devuelveData  = [{codigo:'', descripcion:''}];
+  devuelveData  = [{codigo:'', descripcion:'', serial:''}];
   editandoId = null;
   document.getElementById('btnGuardar').textContent = 'Guardar';
   document.getElementById('formMsg').textContent = '';
@@ -487,7 +488,7 @@ document.getElementById('btnCopiar').addEventListener('click', () => {
   texto += '\ndevuelve:\n';
   devuelveData.forEach(d => {
     if (d.codigo || d.descripcion)
-      texto += `- ${d.codigo || '—'} - ${d.descripcion || '—'}\n`;
+      texto += `- ${d.codigo || '—'} - ${d.descripcion || '—'} - ${d.serial || '—'}\n`;
   });
 
   navigator.clipboard.writeText(texto)
@@ -722,8 +723,8 @@ function editarRegistro(id) {
     ? r.articulos.map(a => ({codigo: a.codigo||'', descripcion: a.descripcion||'', serial: a.serial||''}))
     : [{codigo:'', descripcion:'', serial:''}];
   devuelveData = (r.devuelve && r.devuelve.length)
-    ? r.devuelve.map(a => ({codigo: a.codigo||'', descripcion: a.descripcion||''}))
-    : [{codigo:'', descripcion:''}];
+    ? r.devuelve.map(a => ({codigo: a.codigo||'', descripcion: a.descripcion||'', serial: a.serial||''}))
+    : [{codigo:'', descripcion:'', serial:''}];
   editandoId = id;
   document.getElementById('btnGuardar').textContent = 'Actualizar';
   document.getElementById('formMsg').textContent = 'Editando registro existente';
@@ -756,6 +757,12 @@ function cambiarVista(nombre) {
     toast('No tienes permisos para acceder a esta sección', 'error');
     return;
   }
+
+  if (nombre === 'subir') {
+    window.open('subir_inventario.html', '_blank');
+    return;
+  }
+
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   const tabEl  = document.querySelector(`[data-view="${nombre}"]`);

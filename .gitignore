@@ -1,6 +1,22 @@
+# Node / Rust / Tauri
 node_modules/
 dist/
-build/
+target/
+src-tauri/target/
+
+# Build outputs
+*.exe
+*.msi
+
+# Logs
 *.log
+
+# OS
 .DS_Store
 Thumbs.db
+
+# VS Code
+.vscode/
+
+# Env
+.env
