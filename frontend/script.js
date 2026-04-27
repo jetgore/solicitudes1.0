@@ -228,7 +228,7 @@ function renderArticulos() {
         </div>
       </td>
       <td><textarea placeholder="Descripción del artículo..." rows="1" data-field="descripcion" data-idx="${i}" data-tabla="art" style="height:32px;overflow:hidden">${esc(row.descripcion)}</textarea></td>
-      <td><input type="text" placeholder="Serial Number" value="${esc(row.serial)}" data-field="serial" data-idx="${i}" data-tabla="art" autocomplete="off"></td>
+      <td><input type="text" placeholder="Numero Serie" value="${esc(row.serial)}" data-field="serial" data-idx="${i}" data-tabla="art" autocomplete="off"></td>
       <td class="td-actions">
         <button class="btn-rm" data-idx="${i}" data-tabla="art" ${articulosData.length === 1 ? 'disabled' : ''}>&times;</button>
       </td>
@@ -246,7 +246,7 @@ function renderDevuelve() {
         </div>
       </td>
       <td><textarea placeholder="Detalle del equipo devuelto..." rows="1" data-field="detalle" data-idx="${i}" data-tabla="dev" style="height:32px;overflow:hidden">${esc(row.detalle)}</textarea></td>
-      <td><input type="text" placeholder="Número Serie" value="${esc(row.numeroSerie)}" data-field="numeroSerie" data-idx="${i}" data-tabla="dev" autocomplete="off"></td>
+      <td><input type="text" placeholder="Numero Serie" value="${esc(row.numeroSerie)}" data-field="numeroSerie" data-idx="${i}" data-tabla="dev" autocomplete="off"></td>
       <td class="td-actions">
         <button class="btn-rm" data-idx="${i}" data-tabla="dev" ${devuelveData.length === 1 ? 'disabled' : ''}>&times;</button>
       </td>
@@ -981,6 +981,26 @@ async function exportToExcel() {
 }
 
 document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEMA DARK/LIGHT
+// ─────────────────────────────────────────────────────────────────────────────
+const themeToggle = document.getElementById('themeToggle');
+
+// Aplicar tema guardado al cargar
+if (localStorage.getItem('theme') === 'light') {
+  document.body.classList.add('light-mode');
+  themeToggle.textContent = '☀️ Tema';
+} else {
+  themeToggle.textContent = '🌙 Tema';
+}
+
+themeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('light-mode');
+  const isLight = document.body.classList.contains('light-mode');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  themeToggle.textContent = isLight ? '☀️ Tema' : '🌙 Tema';
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INIT — punto de entrada

@@ -36,6 +36,7 @@
       <span id="statusText">Conectando...</span>
     </div>
     <div class="topbar-user" id="topbarUser"></div>
+    <button id="themeToggle" class="btn btn-ghost">🌙 Tema</button>
     <button class="btn btn-ghost" id="btnLogout" style="font-size:11px;padding:5px 10px">Salir</button>
   </div>
 </div>
@@ -93,7 +94,7 @@
         <tr>
           <th style="width:160px">ID / Código</th>
           <th>Descripcion</th>
-          <th style="width:140px">Serial Number</th>
+          <th style="width:140px">Numero Serie</th>
           <th class="th-actions">
             <button class="btn-add" id="btnAgregarArticulo">+ Agregar</button>
           </th>
@@ -111,7 +112,7 @@
         <tr>
           <th style="width:160px">ID</th>
           <th>Detalle</th>
-          <th style="width:140px">Número Serie</th>
+          <th style="width:140px">Numero Serie</th>
           <th class="th-actions">
             <button class="btn-add" id="btnAgregarDevuelve">+ Agregar</button>
           </th>
@@ -143,7 +144,7 @@
       <option value="bcs">BCS</option>
       <option value="sci">SCI</option>
       <option value="codigo">Código artículo</option>
-      <option value="serial">Serial Number</option>
+      <option value="serial">Numero Serie</option>
       <option value="observaciones">Observaciones</option>
       <option value="devuelve">Devuelve</option>
     </select>
