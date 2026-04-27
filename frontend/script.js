@@ -38,7 +38,7 @@ let currentRole  = 'user';
 let registros    = [];
 let registrosFiltrados = [];
 let articulosData = [{codigo:'', descripcion:'', serial:''}];
-let devuelveData  = [{codigo:'', descripcion:'', serial:''}];
+let devuelveData  = [{id:'', detalle:'', numeroSerie:''}];
 let registrosParsed = [];
 let firebaseReady = false;
 let editandoId = null; // ID del registro en edición (null = modo creación)
@@ -241,12 +241,12 @@ function renderDevuelve() {
     <tr data-idx="${i}" data-tabla="dev">
       <td style="position:relative;overflow:visible">
         <div class="ac-wrap">
-          <input type="text" placeholder="E-XXXXX o buscar..." value="${esc(row.codigo)}" data-field="codigo" data-idx="${i}" data-tabla="dev" autocomplete="off">
+          <input type="text" placeholder="E-XXXXX o buscar..." value="${esc(row.id)}" data-field="id" data-idx="${i}" data-tabla="dev" autocomplete="off">
           <div class="ac-dropdown" id="ac-drop-dev-${i}"></div>
         </div>
       </td>
-      <td><textarea placeholder="Descripción del equipo devuelto..." rows="1" data-field="descripcion" data-idx="${i}" data-tabla="dev" style="height:32px;overflow:hidden">${esc(row.descripcion)}</textarea></td>
-      <td><input type="text" placeholder="Serial Number" value="${esc(row.serial)}" data-field="serial" data-idx="${i}" data-tabla="dev" autocomplete="off"></td>
+      <td><textarea placeholder="Detalle del equipo devuelto..." rows="1" data-field="detalle" data-idx="${i}" data-tabla="dev" style="height:32px;overflow:hidden">${esc(row.detalle)}</textarea></td>
+      <td><input type="text" placeholder="Número Serie" value="${esc(row.numeroSerie)}" data-field="numeroSerie" data-idx="${i}" data-tabla="dev" autocomplete="off"></td>
       <td class="td-actions">
         <button class="btn-rm" data-idx="${i}" data-tabla="dev" ${devuelveData.length === 1 ? 'disabled' : ''}>&times;</button>
       </td>
@@ -321,7 +321,8 @@ function setupAutocomplete(tbodyId, tableType) {
 
   tbody.addEventListener('input', e => {
     const el = e.target;
-    if (el.dataset.field !== 'codigo' || el.dataset.tabla !== tableType) return;
+    const expectedField = tableType === 'art' ? 'codigo' : 'id';
+    if (el.dataset.field !== expectedField || el.dataset.tabla !== tableType) return;
     const idx = parseInt(el.dataset.idx);
     const timerKey = tableType + '-' + idx;
     clearTimeout(acTimers[timerKey]);
@@ -330,7 +331,8 @@ function setupAutocomplete(tbodyId, tableType) {
 
   tbody.addEventListener('keydown', e => {
     const el = e.target;
-    if (el.dataset.field !== 'codigo' || el.dataset.tabla !== tableType) return;
+    const expectedField = tableType === 'art' ? 'codigo' : 'id';
+    if (el.dataset.field !== expectedField || el.dataset.tabla !== tableType) return;
     const idx  = parseInt(el.dataset.idx);
     const drop = document.getElementById('ac-drop-' + tableType + '-' + idx);
     if (!drop || !drop.classList.contains('open')) return;
@@ -414,8 +416,8 @@ function aplicarSeleccion(idx, codigo, descripcion, tableType) {
     renderArticulos();
     setupAutocomplete('artBody', 'art'); // re-bind tras re-render
   } else if (tableType === 'dev') {
-    devuelveData[idx].codigo      = codigo;
-    devuelveData[idx].descripcion = descripcion;
+    devuelveData[idx].id           = codigo;
+    devuelveData[idx].detalle      = descripcion;
     renderDevuelve();
     setupAutocomplete('devBody', 'dev'); // re-bind tras re-render
   }
@@ -443,8 +445,8 @@ document.getElementById('btnAgregarArticulo').addEventListener('click', () => {
 
 document.getElementById('btnAgregarDevuelve').addEventListener('click', () => {
   const last = devuelveData[devuelveData.length - 1];
-  if (!last.codigo && !last.descripcion) { toast('Completa el equipo antes de agregar otro', 'info'); return; }
-  devuelveData.push({codigo:'', descripcion:'', serial:''});
+  if (!last.id && !last.detalle) { toast('Completa el equipo antes de agregar otro', 'info'); return; }
+  devuelveData.push({id:'', detalle:'', numeroSerie:''});
   renderDevuelve();
   setupAutocomplete('devBody', 'dev');
 });
@@ -457,7 +459,7 @@ function limpiarFormulario() {
     document.getElementById(id).value = '';
   });
   articulosData = [{codigo:'', descripcion:'', serial:''}];
-  devuelveData  = [{codigo:'', descripcion:'', serial:''}];
+  devuelveData  = [{id:'', detalle:'', numeroSerie:''}];
   editandoId = null;
   document.getElementById('btnGuardar').textContent = 'Guardar';
   document.getElementById('formMsg').textContent = '';
@@ -487,8 +489,8 @@ document.getElementById('btnCopiar').addEventListener('click', () => {
   });
   texto += '\ndevuelve:\n';
   devuelveData.forEach(d => {
-    if (d.codigo || d.descripcion)
-      texto += `- ${d.codigo || '—'} - ${d.descripcion || '—'} - ${d.serial || '—'}\n`;
+    if (d.id || d.detalle)
+      texto += `- ${d.id || '—'} - ${d.detalle || '—'} - ${d.numeroSerie || '—'}\n`;
   });
 
   navigator.clipboard.writeText(texto)
@@ -505,7 +507,7 @@ document.getElementById('btnGuardar').addEventListener('click', async () => {
   if (!sol && !usr) { toast('Ingresa al menos N° Solicitud o Usuario', 'error'); return; }
 
   const artsL = articulosData.filter(a => a.codigo || a.descripcion);
-  const devL  = devuelveData.filter(a => a.codigo || a.descripcion);
+  const devL  = devuelveData.filter(a => a.id || a.detalle);
 
   const data = {
     solicitud:     sol,
@@ -573,7 +575,7 @@ function filtrarRegistros() {
   }
   registrosFiltrados = registros.filter(r => {
     const artsStr = (r.articulos||[]).map(a => `${a.codigo||''} ${a.descripcion||''} ${a.serial||''}`).join(' ').toLowerCase();
-    const devStr  = (r.devuelve||[]).map(a => `${a.codigo||''} ${a.descripcion||''}`).join(' ').toLowerCase();
+    const devStr  = (r.devuelve||[]).map(a => `${a.id||a.codigo||''} ${a.detalle||a.descripcion||''} ${a.numeroSerie||''}`).join(' ').toLowerCase();
     if (campo === 'all') {
       return ['solicitud','devolucion','usuario','bcs','sci','observaciones','direccion']
         .some(k => (r[k]||'').toLowerCase().includes(q)) || artsStr.includes(q) || devStr.includes(q);
@@ -595,7 +597,7 @@ function renderLista(lista) {
   el.innerHTML = '<div class="reg-list">' + lista.map(r => {
     const arts    = r.articulos || [];
     const devs    = r.devuelve  || [];
-    const hasDev  = devs.filter(d => d.codigo || d.descripcion).length;
+    const hasDev  = devs.filter(d => d.id || d.detalle || d.codigo || d.descripcion).length;
     const hasObs  = !!r.observaciones;
     const pillsDev  = hasDev ? `<span class="pill pill-warn">dev ${hasDev}</span> ` : '';
     const pillsObs  = hasObs ? '<span class="pill pill-blue">obs</span> ' : '';
@@ -605,9 +607,9 @@ function renderLista(lista) {
       ? arts.map(a => `<div class="det-art-row"><div class="det-art-cod">${esc(a.codigo||'—')}</div><div>${esc(a.descripcion||'—')}</div><div class="det-art-ser">${esc(a.serial||'—')}</div></div>`).join('')
       : '<div style="color:var(--text-dim);font-size:13px;padding:4px 0">Sin artículos registrados</div>';
 
-    const devsFiltered = devs.filter(d => d.codigo || d.descripcion);
+    const devsFiltered = devs.filter(d => d.id || d.detalle || d.codigo || d.descripcion);
     const devsHtml = devsFiltered.length
-      ? devsFiltered.map(d => `<div class="det-dev-row">${d.codigo ? `<strong style="font-family:var(--mono);font-size:12px">${esc(d.codigo)}</strong> — ` : ''}${esc(d.descripcion||d.codigo||'')}</div>`).join('')
+      ? devsFiltered.map(d => `<div class="det-dev-row">${(d.id || d.codigo) ? `<strong style="font-family:var(--mono);font-size:12px">${esc(d.id||d.codigo)}</strong> — ` : ''}${esc(d.detalle||d.descripcion||d.id||d.codigo||'')} ${d.numeroSerie ? `<span style="color:var(--text-muted);font-size:12px">(${esc(d.numeroSerie)})</span>` : ''}</div>`).join('')
       : '<div style="color:var(--text-dim);font-size:13px;padding:4px 0">Sin equipos devueltos</div>';
 
     const obsRow = r.observaciones
@@ -685,15 +687,15 @@ function copiarRegistro(id) {
   const arts = (r.articulos || []).filter(a => a.codigo || a.descripcion);
   texto += 'Articulos solicitados:\n';
   if (arts.length) {
-    arts.forEach(a => { texto += `- ${a.codigo || '—'} - ${a.descripcion || '—'}\n`; });
+    arts.forEach(a => { texto += `- ${a.codigo || '—'} - ${a.descripcion || '—'} - ${a.serial || '—'}\n`; });
   } else {
     texto += '- Sin artículos\n';
   }
 
-  const devs = (r.devuelve || []).filter(d => d.codigo || d.descripcion);
+  const devs = (r.devuelve || []).filter(d => d.id || d.detalle || d.codigo || d.descripcion);
   if (devs.length) {
     texto += '\nDevuelve:\n';
-    devs.forEach(d => { texto += `- ${d.codigo || '—'} - ${d.descripcion || '—'}\n`; });
+    devs.forEach(d => { texto += `- ${d.id || d.codigo || '—'} - ${d.detalle || d.descripcion || '—'} - ${d.numeroSerie || '—'}\n`; });
   }
 
   navigator.clipboard.writeText(texto)
@@ -723,8 +725,8 @@ function editarRegistro(id) {
     ? r.articulos.map(a => ({codigo: a.codigo||'', descripcion: a.descripcion||'', serial: a.serial||''}))
     : [{codigo:'', descripcion:'', serial:''}];
   devuelveData = (r.devuelve && r.devuelve.length)
-    ? r.devuelve.map(a => ({codigo: a.codigo||'', descripcion: a.descripcion||'', serial: a.serial||''}))
-    : [{codigo:'', descripcion:'', serial:''}];
+    ? r.devuelve.map(a => ({id: a.id||a.codigo||'', detalle: a.detalle||a.descripcion||'', numeroSerie: a.numeroSerie||''}))
+    : [{id:'', detalle:'', numeroSerie:''}];
   editandoId = id;
   document.getElementById('btnGuardar').textContent = 'Actualizar';
   document.getElementById('formMsg').textContent = 'Editando registro existente';

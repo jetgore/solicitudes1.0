@@ -1,4 +1,4 @@
-:root{
+﻿:root{
   --bg:#0f1117;--surface:#181c27;--surface2:#1e2335;
   --border:#2a3050;--border-bright:#3d4f7c;
   --accent:#4f8ef7;--accent-dim:#1e3a6e;
@@ -186,3 +186,11 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:2px 6px
   .frow2 .sep,.frow2 label:nth-child(3),.frow2 input:nth-child(4){display:none}
   .setup-grid{grid-template-columns:1fr}
 }
+
+/* Ocultar apartado Importar TXT */
+#view-importar { display: none; }
+.nav-tab[data-view="importar"] { display: none !important; }
+
+/* Ocultar contenido de carga de archivo TXT */
+#view-importar p:first-of-type { display: none; }
+#importFile { display: none; }
