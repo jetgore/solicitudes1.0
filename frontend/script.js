@@ -931,6 +931,58 @@ document.getElementById('btnImportar').addEventListener('click', async () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// EXPORTAR A EXCEL
+// ─────────────────────────────────────────────────────────────────────────────
+async function exportToExcel() {
+  if (!db) { toast('Firebase no conectado', 'error'); return; }
+
+  // Obtener registros según rol
+  let registrosParaExportar = [];
+  try {
+    const q = query(collection(db, coleccion), orderBy('fecha', 'desc'));
+    const snap = await getDocs(q);
+    registrosParaExportar = snap.docs.map(d => Object.assign({id: d.id}, d.data()));
+    if (currentRole === 'user') {
+      registrosParaExportar = registrosParaExportar.filter(r => r.uid === currentUser.uid);
+    }
+  } catch(e) {
+    console.error('Error al obtener registros:', e);
+    toast('Error al obtener datos', 'error');
+    return;
+  }
+
+  if (!registrosParaExportar.length) {
+    toast('No hay registros para exportar', 'info');
+    return;
+  }
+
+  // Transformar datos
+  const data = registrosParaExportar.map(r => ({
+    solicitudId: r.solicitud || '',
+    devolucionId: r.devolucion || '',
+    usuarioAfectado: r.usuario || '',
+    direccion: r.direccion || '',
+    bcs: r.bcs || '',
+    scti: r.sci || '',
+    observaciones: r.observaciones || '',
+    createdAt: r.fecha ? r.fecha.toDate().toISOString() : '',
+    updatedAt: r.fecha ? r.fecha.toDate().toISOString() : '', // Usar fecha como updatedAt
+    equipamientoSolicitado: (r.articulos || []).map(a => `${a.codigo || ''} | ${a.descripcion || ''} | ${a.serial || ''}`).join('\n'),
+    equipamientoDevuelto: (r.devuelve || []).map(d => `${d.id || d.codigo || ''} | ${d.detalle || d.descripcion || ''} | ${d.numeroSerie || ''}`).join('\n')
+  }));
+
+  // Generar Excel
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Registros");
+  const filename = currentRole === 'user' ? 'registros_personales.xlsx' : 'registros_globales.xlsx';
+  XLSX.writeFile(workbook, filename);
+  toast('Archivo Excel descargado', 'success');
+}
+
+document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // INIT — punto de entrada
 // ─────────────────────────────────────────────────────────────────────────────
 (async () => {
