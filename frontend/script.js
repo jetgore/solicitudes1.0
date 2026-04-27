@@ -643,6 +643,7 @@ function renderLista(lista) {
         ${devsHtml}
         <div class="det-actions">
           <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" data-action="copiar" data-rid="${r.id}">&#128203; Copiar</button>
+          <button class="btn btn-primary" style="font-size:12px;padding:6px 12px" data-action="correo" data-rid="${r.id}">✉️ Enviar por correo</button>
           <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" data-action="editar" data-rid="${r.id}" style="display:${(currentRole === 'admin' || r.uid === currentUser.uid) ? 'inline-flex' : 'none'}">Editar</button>
           <button class="btn btn-danger" style="font-size:12px;padding:6px 12px;display:${(currentRole === 'admin' || r.uid === currentUser.uid) ? 'inline-flex' : 'none'}" data-action="eliminar" data-rid="${r.id}">Eliminar</button>
         </div>
@@ -666,13 +667,14 @@ document.getElementById('regList').addEventListener('click', async e => {
   const rid    = btn.dataset.rid;
   const action = btn.dataset.action;
   if (action === 'copiar')   copiarRegistro(rid);
+  if (action === 'correo')   enviarCorreo(rid);
   if (action === 'editar')   editarRegistro(rid);
   if (action === 'eliminar') await eliminarRegistro(rid);
 });
 
-function copiarRegistro(id) {
+function generarTextoRegistro(id) {
   const r = registros.find(x => x.id === id);
-  if (!r) return;
+  if (!r) return '';
 
   let texto = '';
   texto += `solicitud: ${r.solicitud || ''}\n`;
@@ -698,9 +700,30 @@ function copiarRegistro(id) {
     devs.forEach(d => { texto += `- ${d.id || d.codigo || '—'} - ${d.detalle || d.descripcion || '—'} - ${d.numeroSerie || '—'}\n`; });
   }
 
+  return texto;
+}
+
+function copiarRegistro(id) {
+  const texto = generarTextoRegistro(id);
+  if (!texto) return;
+
   navigator.clipboard.writeText(texto)
     .then(() => toast('Registro copiado al portapeles'))
     .catch(() => toast('Error al copiar', 'error'));
+}
+
+function enviarCorreo(id) {
+  const texto = generarTextoRegistro(id);
+  if (!texto) {
+    toast('No hay datos para enviar', 'error');
+    return;
+  }
+
+  const asunto = encodeURIComponent('Solicitud de equipamiento');
+  const cuerpo = encodeURIComponent(texto);
+  const mailtoLink = `mailto:?subject=${asunto}&body=${cuerpo}`;
+
+  window.location.href = mailtoLink;
 }
 
 document.getElementById('searchInput').addEventListener('input', filtrarRegistros);
