@@ -94,6 +94,39 @@ function formatLogFecha(ts) {
   } catch(e) { return '—'; }
 }
 
+function getTipoOperacionSeleccionado() {
+  return document.querySelector('input[name="tipoOperacion"]:checked')?.value || 'instalacion';
+}
+
+function setTipoOperacionSeleccionado(value) {
+  const input = document.querySelector(`input[name="tipoOperacion"][value="${value}"]`);
+  if (input) input.checked = true;
+}
+
+function calcularProgreso(fechaInicio, fechaLimite) {
+  if (!fechaInicio || !fechaLimite) return null;
+  const inicio = fechaInicio.toDate ? fechaInicio.toDate() : new Date(fechaInicio);
+  const limite = fechaLimite.toDate ? fechaLimite.toDate() : new Date(fechaLimite);
+  const ahora = new Date();
+  const total = limite - inicio;
+  if (total <= 0) return 0;
+  const restante = limite - ahora;
+  const porcentaje = (restante / total) * 100;
+  return porcentaje;
+}
+
+function obtenerColor(porcentaje) {
+  if (porcentaje === null) return '';
+  if (porcentaje <= 0) return 'rojo';
+  if (porcentaje <= 29) return 'amarillo';
+  return 'verde';
+}
+
+function actualizarEstados() {
+  if (!document.getElementById('view-registros').classList.contains('active')) return;
+  renderLista(registrosFiltrados.length ? registrosFiltrados : registros);
+}
+
 function copiarAlPortapapeles(texto) {
   // Intenta con Clipboard API (moderno, HTTPS)
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -781,9 +814,10 @@ document.getElementById('btnAgregarDevuelve').addEventListener('click', () => {
 // FORMULARIO NUEVA SOLICITUD
 // ─────────────────────────────────────────────────────────────────────────────
 function limpiarFormulario() {
-  ['fSolicitud','fDevolucion','fUsuario','fDireccion','fBcs','fSci','fObs'].forEach(id => {
+  ['fSolicitud','fDevolucion','fUsuario','fDireccion','fBcs','fSci','observacion'].forEach(id => {
     document.getElementById(id).value = '';
   });
+  setTipoOperacionSeleccionado('instalacion');
   // El creador se mantiene igual (es el usuario logueado)
   articulosData = [{codigo:'', descripcion:'', serial:''}];
   devuelveData  = [{id:'', detalle:'', numeroSerie:''}];
@@ -835,18 +869,34 @@ document.getElementById('btnGuardar').addEventListener('click', async () => {
   const artsL = articulosData.filter(a => a.codigo || a.descripcion);
   const devL  = devuelveData.filter(a => a.id || a.detalle);
 
+  const tipoOp = getTipoOperacionSeleccionado();
+  let fechaInicioPermuta = null;
+  let fechaLimitePermuta = null;
+  if (tipoOp === 'permuta') {
+    if (editandoId && originalData && originalData.tipoOperacion === 'permuta' && originalData.fechaInicioPermuta && originalData.fechaLimitePermuta) {
+      fechaInicioPermuta = originalData.fechaInicioPermuta;
+      fechaLimitePermuta = originalData.fechaLimitePermuta;
+    } else {
+      fechaInicioPermuta = new Date();
+      fechaLimitePermuta = new Date(fechaInicioPermuta.getTime() + (167 * 60 * 60 * 1000));
+    }
+  }
+
   const data = {
-    solicitud:     sol,
-    devolucion:    document.getElementById('fDevolucion').value.trim(),
-    usuario:       usr,
-    creador:       document.getElementById('fCreador').value.trim(),
-    direccion:     document.getElementById('fDireccion').value.trim(),
-    bcs:           document.getElementById('fBcs').value.trim(),
-    sci:           document.getElementById('fSci').value.trim(),
-    observaciones: document.getElementById('fObs').value.trim(),
-    articulos:     artsL,
-    devuelve:      devL,
-    uid:           currentUser ? currentUser.uid : '',
+    solicitud:          sol,
+    devolucion:         document.getElementById('fDevolucion').value.trim(),
+    usuario:            usr,
+    creador:            document.getElementById('fCreador').value.trim(),
+    direccion:          document.getElementById('fDireccion').value.trim(),
+    bcs:                document.getElementById('fBcs').value.trim(),
+    sci:                document.getElementById('fSci').value.trim(),
+    observaciones:      document.getElementById('observacion').value.trim(),
+    tipoOperacion:      tipoOp,
+    fechaInicioPermuta: fechaInicioPermuta,
+    fechaLimitePermuta: fechaLimitePermuta,
+    articulos:          artsL,
+    devuelve:           devL,
+    uid:                currentUser ? currentUser.uid : '',
   };
 
   btn.disabled = true;
@@ -856,7 +906,7 @@ document.getElementById('btnGuardar').addEventListener('click', async () => {
       // MODO EDICIÓN — actualizar documento existente, conservar fecha original
       await updateDoc(doc(db, coleccion, editandoId), data);
       const changedFields = [];
-      const fieldsToCheck = ['solicitud', 'devolucion', 'usuario', 'creador', 'direccion', 'bcs', 'sci', 'observaciones', 'articulos', 'devuelve'];
+      const fieldsToCheck = ['solicitud', 'devolucion', 'usuario', 'creador', 'direccion', 'bcs', 'sci', 'observaciones', 'tipoOperacion', 'articulos', 'devuelve'];
       fieldsToCheck.forEach(field => {
         if (JSON.stringify(data[field]) !== JSON.stringify(originalData[field])) {
           changedFields.push(field);
@@ -927,15 +977,29 @@ function filtrarRegistros() {
 
 function renderLista(lista) {
   const el = document.getElementById('regList');
+  const headers = document.getElementById('regColHeaders');
   if (!lista.length) {
     el.innerHTML = `<div class="empty">${db ? 'Sin registros que mostrar' : 'Configura Firebase primero'}</div>`;
+    if (headers) headers.classList.add('oculto');
     return;
   }
+  if (headers) headers.classList.remove('oculto');
   el.innerHTML = '<div class="reg-list">' + lista.map(r => {
     const arts    = r.articulos || [];
     const devs    = r.devuelve  || [];
     const hasDev  = devs.filter(d => d.id || d.detalle || d.codigo || d.descripcion).length;
     const hasObs  = !!r.observaciones;
+    const tipoOpText = r.tipoOperacion === 'permuta'
+      ? 'Permuta'
+      : r.tipoOperacion === 'instalacion'
+        ? 'Instalación'
+        : '—';
+    const porcentaje = calcularProgreso(r.fechaInicioPermuta, r.fechaLimitePermuta);
+    const colorClass = obtenerColor(porcentaje);
+    const estadoPermuta = r.tipoOperacion === 'permuta'
+      ? (porcentaje === null ? 'Sin fechas' : porcentaje <= 0 ? 'Vencido' : `${Math.max(0, Math.round(porcentaje))}% restante`)
+      : 'No aplica';
+    const estadoClass = colorClass ? `estado-${colorClass}` : '';
     const pillsDev  = hasDev ? `<span class="pill pill-warn">dev ${hasDev}</span> ` : '';
     const pillsObs  = hasObs ? '<span class="pill pill-blue">obs</span> ' : '';
     const pillsArts = arts.length ? `<span class="pill pill-green">art ${arts.length}</span>` : '';
@@ -953,7 +1017,7 @@ function renderLista(lista) {
       ? `<div class="det-field" style="grid-column:1/-1"><label>Observaciones</label><div class="det-val warn">${esc(r.observaciones)}</div></div>`
       : '';
 
-    return `<div class="reg-item" id="ri-${r.id}">
+    return `<div class="reg-item ${colorClass}" id="ri-${r.id}">
       <div class="reg-header" data-rid="${r.id}">
         <div class="reg-sol">${esc(r.solicitud||'—')}</div>
         <div class="reg-user">${esc(r.usuario||'—')} <span style="font-size:11px;color:var(--text-muted)">${pillsDev}${pillsObs}${pillsArts}</span></div>
@@ -968,6 +1032,9 @@ function renderLista(lista) {
           <div class="det-field"><label>Usuario</label><div class="det-val">${esc(r.usuario||'—')}</div></div>
           <div class="det-field"><label>Creador</label><div class="det-val" style="color:var(--text-muted);font-size:12px;font-family:var(--mono)">${esc(r.creador||'—')}</div></div>
           <div class="det-field"><label>Fecha</label><div class="det-val" style="color:var(--text-muted)">${formatFecha(r.fecha)}</div></div>
+          <div class="det-field"><label>Operación</label><div class="det-val mono">${esc(tipoOpText)}</div></div>
+          ${r.tipoOperacion === 'permuta' ? `<div class="det-field"><label>Estado permuta</label><div class="det-val ${estadoClass}">${esc(estadoPermuta)}</div></div>` : ''}
+          ${r.tipoOperacion === 'permuta' ? `<div class="det-field"><label>Inicio permuta</label><div class="det-val">${formatFecha(r.fechaInicioPermuta)}</div></div><div class="det-field"><label>Fecha límite</label><div class="det-val">${formatFecha(r.fechaLimitePermuta)}</div></div>` : ''}
           <div class="det-field" style="grid-column:1/-1"><label>Dirección</label><div class="det-val">${esc(r.direccion||'—')}</div></div>
           <div class="det-field"><label>BCS</label><div class="det-val mono">${esc(r.bcs||'—')}</div></div>
           <div class="det-field"><label>SCI</label><div class="det-val mono">${esc(r.sci||'—')}</div></div>
@@ -1080,7 +1147,8 @@ function editarRegistro(id) {
   document.getElementById('fDireccion').value   = r.direccion     || '';
   document.getElementById('fBcs').value         = r.bcs           || '';
   document.getElementById('fSci').value         = r.sci           || '';
-  document.getElementById('fObs').value         = r.observaciones || '';
+  document.getElementById('observacion').value  = r.observaciones || '';
+  setTipoOperacionSeleccionado(r.tipoOperacion || 'instalacion');
   articulosData = (r.articulos && r.articulos.length)
     ? r.articulos.map(a => ({codigo: a.codigo||'', descripcion: a.descripcion||'', serial: a.serial||''}))
     : [{codigo:'', descripcion:'', serial:''}];
@@ -1326,6 +1394,9 @@ async function exportToExcel() {
     direccion: r.direccion || '',
     bcs: r.bcs || '',
     scti: r.sci || '',
+    tipoOperacion: r.tipoOperacion || '',
+    fechaInicioPermuta: r.fechaInicioPermuta ? (r.fechaInicioPermuta.toDate ? r.fechaInicioPermuta.toDate().toISOString() : new Date(r.fechaInicioPermuta).toISOString()) : '',
+    fechaLimitePermuta: r.fechaLimitePermuta ? (r.fechaLimitePermuta.toDate ? r.fechaLimitePermuta.toDate().toISOString() : new Date(r.fechaLimitePermuta).toISOString()) : '',
     observaciones: r.observaciones || '',
     createdAt: r.fecha ? r.fecha.toDate().toISOString() : '',
     updatedAt: r.fecha ? r.fecha.toDate().toISOString() : '', // Usar fecha como updatedAt
@@ -1375,6 +1446,8 @@ themeToggle.addEventListener('click', () => {
   setupTablaEvents('devBody');
   setupAutocomplete('artBody', 'art');
   setupAutocomplete('devBody', 'dev');
+  setTipoOperacionSeleccionado('instalacion');
+  setInterval(actualizarEstados, 60000);
 
   // Cargar config guardada o usar default
   const cfgGuardada = cargarCfg();

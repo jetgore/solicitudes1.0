@@ -197,6 +197,34 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .sf-field input{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;transition:border-color .15s}
 .sf-field input:focus{border-color:var(--accent)}
 
+/* REGISTROS — column headers */
+.reg-col-headers{
+  display:grid;
+  grid-template-columns:110px 1fr 110px 110px auto;
+  align-items:center;
+  gap:12px;
+  padding:6px 14px;
+  margin-bottom:4px;
+  border-bottom:1px solid var(--border);
+}
+.reg-col-headers.oculto{
+  visibility:hidden;
+  pointer-events:none;
+}
+.reg-col-h{
+  font-family:var(--mono);
+  font-size:10px;
+  font-weight:500;
+  color:var(--text-dim);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+@media(max-width:600px){
+  .reg-col-headers{grid-template-columns:90px 1fr auto}
+  .reg-col-h--bcs,.reg-col-h--sci{display:none}
+}
+
 .empty{padding:40px;text-align:center;color:var(--text-dim);font-size:13px}
 code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:2px 6px;border-radius:4px;border:1px solid var(--border);color:var(--warning)}
 
@@ -228,10 +256,3 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:2px 6px
 /* Ocultar contenido de carga de archivo TXT */
 #view-importar p:first-of-type { display: none; }
 #importFile { display: none; }
-.app-footer {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  opacity: 0.2;
-  font-size: 10px;
-}

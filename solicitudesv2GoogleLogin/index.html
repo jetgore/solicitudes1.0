@@ -20,6 +20,11 @@
       <input type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password">
     </div>
     <button class="login-btn" id="loginBtn" disabled>Ingresar</button>
+    <div class="login-divider" style="margin:16px 0;display:flex;align-items:center;gap:12px"><span style="flex:1;height:1px;background:var(--border)"></span><span style="font-size:12px;color:var(--text-dim)">O</span><span style="flex:1;height:1px;background:var(--border)"></span></div>
+    <button type="button" class="login-btn login-google" id="btnGoogleLogin" style="background:#fff;color:#000;border:1px solid var(--border)">
+      <svg style="width:16px;height:16px;vertical-align:middle;margin-right:8px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><path d="M12 9v6M9 12h6"/></svg>
+      Iniciar con Google
+    </button>
     <div class="login-error" id="loginError"></div>
     <div class="login-init" id="loginInit">Inicializando Firebase...</div>
   </div>
@@ -37,7 +42,6 @@
     </div>
     <div class="topbar-user" id="topbarUser"></div>
     <button id="themeToggle" class="btn btn-ghost">🌙 Tema</button>
-    <button id="btnResetPassword" class="btn btn-ghost" style="font-size:11px;padding:5px 10px">🔑 Cambiar contraseña</button>
     <button class="btn btn-ghost" id="btnLogout" style="font-size:11px;padding:5px 10px">Salir</button>
   </div>
 </div>
@@ -70,10 +74,6 @@
       <input type="text" id="fUsuario" placeholder="Nombre completo" autocomplete="off">
     </div>
     <div class="frow">
-      <label>Creador:</label>
-      <input type="text" id="fCreador" placeholder="Creado por..." autocomplete="off" readonly style="background:var(--surface2);color:var(--text-dim);cursor:not-allowed">
-    </div>
-    <div class="frow">
       <label>Direccion:</label>
       <input type="text" id="fDireccion" placeholder="Dirección o Teletrabajo" autocomplete="off">
     </div>
@@ -89,22 +89,12 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════ BUSCADOR GLOBAL -->
-  <div class="fblock" id="buscadorGlobal" style="border:2px solid var(--accent);background:var(--bg-secondary)">
-    <div class="fblock-title">🔎 Buscar Equipamiento</div>
-    <div style="display:flex;gap:10px;margin-bottom:12px">
-      <input type="text" id="busquedaGlobal" placeholder="Buscar por ID o descripción..." style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
-      <button id="btnLimpiarBusqueda" class="btn btn-ghost" style="font-size:11px;padding:5px 10px">✕ Limpiar</button>
-    </div>
-    <div id="resultadosBusqueda" style="background:var(--bg);border:1px solid var(--border);border-radius:4px;max-height:200px;overflow-y:auto;display:none"></div>
-  </div>
-
   <div class="fblock">
-    <div class="fblock-title">Solicitud</div>
+    <div class="fblock-title">Articulos</div>
     <table class="art-table" id="artTable">
       <thead>
         <tr>
-          <th style="width:160px">ID</th>
+          <th style="width:160px">ID / Código</th>
           <th>Descripcion</th>
           <th style="width:140px">Numero Serie</th>
           <th class="th-actions">
@@ -123,7 +113,7 @@
       <thead>
         <tr>
           <th style="width:160px">ID</th>
-          <th>Descripcion</th>
+          <th>Detalle</th>
           <th style="width:140px">Numero Serie</th>
           <th class="th-actions">
             <button class="btn-add" id="btnAgregarDevuelve">+ Agregar</button>
@@ -153,7 +143,6 @@
       <option value="solicitud">N° Solicitud</option>
       <option value="devolucion">N° Devolución</option>
       <option value="usuario">Usuario</option>
-      <option value="creador">Creador</option>
       <option value="bcs">BCS</option>
       <option value="sci">SCI</option>
       <option value="codigo">Código artículo</option>
@@ -234,9 +223,6 @@
   <span id="toastIcon" style="font-size:14px">&#10003;</span>
   <span id="toastMsg"></span>
 </div>
-<footer class="app-footer">
-  Desarrollado por Francisco Fraile
-</footer>
 
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script type="module" src="script.js"></script>

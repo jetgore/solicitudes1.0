@@ -84,8 +84,15 @@
       <input type="text" id="fSci" placeholder="SCTI-XXXXX" autocomplete="off">
     </div>
     <div class="frow">
-      <label>Observacion:</label>
-      <input type="text" id="fObs" placeholder="Ej: Permuta Notebook, Reposición..." autocomplete="off">
+      <label>Tipo operación:</label>
+      <div class="tipo-operacion">
+        <label><input type="radio" name="tipoOperacion" value="permuta"> Permuta</label>
+        <label><input type="radio" name="tipoOperacion" value="instalacion" checked> Instalación</label>
+      </div>
+    </div>
+    <div class="frow">
+      <label>Observación:</label>
+      <textarea id="observacion" placeholder="Ej: Permuta Notebook, Reposición..." autocomplete="off"></textarea>
     </div>
   </div>
 
@@ -164,6 +171,13 @@
     <button class="btn btn-ghost" id="btnActualizar" style="font-size:12px;padding:7px 12px">&#8635; Actualizar</button>
     <button class="btn btn-primary" id="btnExportExcel" style="font-size:12px;padding:7px 12px">Exportar a Excel</button>
   </div>
+  <div class="reg-col-headers oculto" id="regColHeaders">
+    <div class="reg-col-h">Solicitud</div>
+    <div class="reg-col-h">Usuario afectado</div>
+    <div class="reg-col-h reg-col-h--bcs">BCS</div>
+    <div class="reg-col-h reg-col-h--sci">SCTI</div>
+    <div></div>
+  </div>
   <div id="regList"><div class="empty">Cargando registros...</div></div>
 </div>
 
@@ -234,9 +248,7 @@
   <span id="toastIcon" style="font-size:14px">&#10003;</span>
   <span id="toastMsg"></span>
 </div>
-<footer class="app-footer">
-  Desarrollado por Francisco Fraile
-</footer>
+
 
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script type="module" src="script.js"></script>

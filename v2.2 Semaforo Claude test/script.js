@@ -94,6 +94,90 @@ function formatLogFecha(ts) {
   } catch(e) { return '—'; }
 }
 
+function getTipoOperacionSeleccionado() {
+  return document.querySelector('input[name="tipoOperacion"]:checked')?.value || 'instalacion';
+}
+
+function setTipoOperacionSeleccionado(value) {
+  const input = document.querySelector(`input[name="tipoOperacion"][value="${value}"]`);
+  if (input) input.checked = true;
+}
+
+function calcularProgreso(fechaInicio, fechaLimite) {
+  if (!fechaInicio || !fechaLimite) return null;
+  const inicio = fechaInicio.toDate ? fechaInicio.toDate() : new Date(fechaInicio);
+  const limite = fechaLimite.toDate ? fechaLimite.toDate() : new Date(fechaLimite);
+  const ahora = new Date();
+  const total = limite - inicio;
+  if (total <= 0) return 0;
+  const restante = limite - ahora;
+  const porcentaje = (restante / total) * 100;
+  return porcentaje;
+}
+
+function obtenerColor(porcentaje) {
+  if (porcentaje === null) return '';
+  if (porcentaje <= 0) return 'rojo';
+  if (porcentaje <= 29) return 'amarillo';
+  return 'verde';
+}
+
+function actualizarEstados() {
+  if (!document.getElementById('view-registros').classList.contains('active')) return;
+  renderLista(registrosFiltrados.length ? registrosFiltrados : registros);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PERMUTA — temporizador y colores
+// ─────────────────────────────────────────────────────────────────────────────
+const PERMUTA_HORAS = 167;
+
+function calcularProgreso(fechaInicio, fechaLimite) {
+  if (!fechaInicio || !fechaLimite) return null;
+  const inicio  = (fechaInicio.toDate  ? fechaInicio.toDate()  : new Date(fechaInicio));
+  const limite  = (fechaLimite.toDate  ? fechaLimite.toDate()  : new Date(fechaLimite));
+  const ahora   = new Date();
+  const total   = limite - inicio;
+  const restante = limite - ahora;
+  if (total <= 0) return 0;
+  return Math.max(0, (restante / total) * 100);
+}
+
+function obtenerColorPermuta(porcentaje) {
+  if (porcentaje === null) return null;
+  if (porcentaje <= 0)  return 'rojo';
+  if (porcentaje <= 29) return 'amarillo';
+  return 'verde';
+}
+
+function formatearRestante(fechaLimite) {
+  if (!fechaLimite) return '';
+  const limite = fechaLimite.toDate ? fechaLimite.toDate() : new Date(fechaLimite);
+  const ahora  = new Date();
+  const ms     = limite - ahora;
+  if (ms <= 0) return 'Vencida';
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h >= 24) {
+    const d = Math.floor(h / 24);
+    const hr = h % 24;
+    return `${d}d ${hr}h restantes`;
+  }
+  return `${h}h ${m}m restantes`;
+}
+
+function aplicarColorPermutas() {
+  registrosFiltrados.forEach(r => {
+    const el = document.getElementById('ri-' + r.id);
+    if (!el) return;
+    el.classList.remove('permuta-verde', 'permuta-amarillo', 'permuta-rojo');
+    if (r.tipoOperacion !== 'permuta') return;
+    const pct   = calcularProgreso(r.fechaInicioPermuta, r.fechaLimitePermuta);
+    const color = obtenerColorPermuta(pct);
+    if (color) el.classList.add('permuta-' + color);
+  });
+}
+
 function copiarAlPortapapeles(texto) {
   // Intenta con Clipboard API (moderno, HTTPS)
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -781,9 +865,10 @@ document.getElementById('btnAgregarDevuelve').addEventListener('click', () => {
 // FORMULARIO NUEVA SOLICITUD
 // ─────────────────────────────────────────────────────────────────────────────
 function limpiarFormulario() {
-  ['fSolicitud','fDevolucion','fUsuario','fDireccion','fBcs','fSci','fObs'].forEach(id => {
+  ['fSolicitud','fDevolucion','fUsuario','fDireccion','fBcs','fSci','observacion'].forEach(id => {
     document.getElementById(id).value = '';
   });
+  setTipoOperacionSeleccionado('instalacion');
   // El creador se mantiene igual (es el usuario logueado)
   articulosData = [{codigo:'', descripcion:'', serial:''}];
   devuelveData  = [{id:'', detalle:'', numeroSerie:''}];
@@ -835,6 +920,20 @@ document.getElementById('btnGuardar').addEventListener('click', async () => {
   const artsL = articulosData.filter(a => a.codigo || a.descripcion);
   const devL  = devuelveData.filter(a => a.id || a.detalle);
 
+  // Tipo operación y fechas de permuta
+  const tipoOp = document.querySelector('input[name="tipoOperacion"]:checked')?.value || '';
+  let fechaInicioPermuta = null;
+  let fechaLimitePermuta = null;
+  if (tipoOp === 'permuta' && !editandoId) {
+    // Solo crear fechas al crear, no al editar (se preservan las originales)
+    fechaInicioPermuta = new Date();
+    fechaLimitePermuta = new Date(fechaInicioPermuta.getTime() + PERMUTA_HORAS * 3600 * 1000);
+  } else if (tipoOp === 'permuta' && editandoId && originalData) {
+    // Al editar permuta: conservar fechas originales si ya existen
+    fechaInicioPermuta = originalData.fechaInicioPermuta || new Date();
+    fechaLimitePermuta = originalData.fechaLimitePermuta || new Date(new Date().getTime() + PERMUTA_HORAS * 3600 * 1000);
+  }
+
   const data = {
     solicitud:     sol,
     devolucion:    document.getElementById('fDevolucion').value.trim(),
@@ -843,10 +942,13 @@ document.getElementById('btnGuardar').addEventListener('click', async () => {
     direccion:     document.getElementById('fDireccion').value.trim(),
     bcs:           document.getElementById('fBcs').value.trim(),
     sci:           document.getElementById('fSci').value.trim(),
-    observaciones: document.getElementById('fObs').value.trim(),
+    observaciones: document.getElementById('observacion').value.trim(),
     articulos:     artsL,
     devuelve:      devL,
     uid:           currentUser ? currentUser.uid : '',
+    tipoOperacion:      tipoOp || '',
+    fechaInicioPermuta: fechaInicioPermuta,
+    fechaLimitePermuta: fechaLimitePermuta,
   };
 
   btn.disabled = true;
@@ -856,7 +958,7 @@ document.getElementById('btnGuardar').addEventListener('click', async () => {
       // MODO EDICIÓN — actualizar documento existente, conservar fecha original
       await updateDoc(doc(db, coleccion, editandoId), data);
       const changedFields = [];
-      const fieldsToCheck = ['solicitud', 'devolucion', 'usuario', 'creador', 'direccion', 'bcs', 'sci', 'observaciones', 'articulos', 'devuelve'];
+      const fieldsToCheck = ['solicitud', 'devolucion', 'usuario', 'creador', 'direccion', 'bcs', 'sci', 'observaciones', 'tipoOperacion', 'articulos', 'devuelve'];
       fieldsToCheck.forEach(field => {
         if (JSON.stringify(data[field]) !== JSON.stringify(originalData[field])) {
           changedFields.push(field);
@@ -927,10 +1029,13 @@ function filtrarRegistros() {
 
 function renderLista(lista) {
   const el = document.getElementById('regList');
+  const headers = document.getElementById('regColHeaders');
   if (!lista.length) {
     el.innerHTML = `<div class="empty">${db ? 'Sin registros que mostrar' : 'Configura Firebase primero'}</div>`;
+    if (headers) headers.classList.add('oculto');
     return;
   }
+  if (headers) headers.classList.remove('oculto');
   el.innerHTML = '<div class="reg-list">' + lista.map(r => {
     const arts    = r.articulos || [];
     const devs    = r.devuelve  || [];
@@ -939,6 +1044,30 @@ function renderLista(lista) {
     const pillsDev  = hasDev ? `<span class="pill pill-warn">dev ${hasDev}</span> ` : '';
     const pillsObs  = hasObs ? '<span class="pill pill-blue">obs</span> ' : '';
     const pillsArts = arts.length ? `<span class="pill pill-green">art ${arts.length}</span>` : '';
+
+    // Permuta: calcular progreso y badge
+    let permutaBadgeHtml = '';
+    let permutaDetailHtml = '';
+    let permutaColorClass = '';
+    if (r.tipoOperacion === 'permuta') {
+      const pct   = calcularProgreso(r.fechaInicioPermuta, r.fechaLimitePermuta);
+      const color = obtenerColor(pct);
+      permutaColorClass = color ? ' ' + color : '';
+      const restanteStr = pct !== null ? (pct <= 0 ? 'Vencido' : `${Math.max(0, Math.round(pct))}% restante`) : 'Sin fechas';
+      permutaBadgeHtml = color
+        ? `<span class="permuta-badge ${color}">⏱ ${restanteStr}</span> `
+        : '<span class="permuta-badge">⏱ Permuta</span> ';
+      const inicioStr = r.fechaInicioPermuta ? formatFecha(r.fechaInicioPermuta) : '—';
+      const limiteStr = r.fechaLimitePermuta ? formatFecha(r.fechaLimitePermuta) : '—';
+      permutaDetailHtml = `<div class="permuta-detail${color ? ' ' + color : ''}">
+        <strong>Permuta</strong>
+        <span>Inicio: ${inicioStr}</span>
+        <span>Límite: ${limiteStr}</span>
+        <span>${restanteStr}</span>
+      </div>`;
+    } else if (r.tipoOperacion === 'instalacion') {
+      permutaBadgeHtml = '<span class="pill pill-blue">instalación</span> ';
+    }
 
     const artsHtml = arts.length
       ? arts.map(a => `<div class="det-art-row"><div class="det-art-cod">${esc(a.codigo||'—')}</div><div>${esc(a.descripcion||'—')}</div><div class="det-art-ser">${esc(a.serial||'—')}</div></div>`).join('')
@@ -953,15 +1082,16 @@ function renderLista(lista) {
       ? `<div class="det-field" style="grid-column:1/-1"><label>Observaciones</label><div class="det-val warn">${esc(r.observaciones)}</div></div>`
       : '';
 
-    return `<div class="reg-item" id="ri-${r.id}">
+    return `<div class="reg-item${permutaColorClass}" id="ri-${r.id}">
       <div class="reg-header" data-rid="${r.id}">
         <div class="reg-sol">${esc(r.solicitud||'—')}</div>
-        <div class="reg-user">${esc(r.usuario||'—')} <span style="font-size:11px;color:var(--text-muted)">${pillsDev}${pillsObs}${pillsArts}</span></div>
+        <div class="reg-user">${esc(r.usuario||'—')} <span style="font-size:11px;color:var(--text-muted)">${permutaBadgeHtml}${pillsDev}${pillsObs}${pillsArts}</span></div>
         <div class="reg-bcs">${esc(r.bcs||'—')}</div>
         <div class="reg-sci">${esc(r.sci||'—')}</div>
         <div class="reg-chevron">&#9660;</div>
       </div>
       <div class="reg-body">
+        ${permutaDetailHtml}
         <div class="det-grid">
           <div class="det-field"><label>N° Solicitud</label><div class="det-val mono">${esc(r.solicitud||'—')}</div></div>
           <div class="det-field"><label>N° Devolución</label><div class="det-val mono">${esc(r.devolucion||'—')}</div></div>
@@ -1080,7 +1210,8 @@ function editarRegistro(id) {
   document.getElementById('fDireccion').value   = r.direccion     || '';
   document.getElementById('fBcs').value         = r.bcs           || '';
   document.getElementById('fSci').value         = r.sci           || '';
-  document.getElementById('fObs').value         = r.observaciones || '';
+  document.getElementById('observacion').value  = r.observaciones || '';
+  setTipoOperacionSeleccionado(r.tipoOperacion || 'instalacion');
   articulosData = (r.articulos && r.articulos.length)
     ? r.articulos.map(a => ({codigo: a.codigo||'', descripcion: a.descripcion||'', serial: a.serial||''}))
     : [{codigo:'', descripcion:'', serial:''}];
@@ -1365,6 +1496,30 @@ themeToggle.addEventListener('click', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TIPO OPERACION — listeners de radios (diferidos, seguros ante DOM oculto)
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener('change', e => {
+  if (e.target.name === 'tipoOperacion') {
+    const cl = document.getElementById('tipoClear');
+    if (cl) cl.style.display = 'inline';
+  }
+});
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'tipoClear') {
+    document.querySelectorAll('input[name="tipoOperacion"]').forEach(r => r.checked = false);
+    e.target.style.display = 'none';
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTUALIZACIÓN AUTOMÁTICA DE COLORES DE PERMUTA (cada 60 s)
+// ─────────────────────────────────────────────────────────────────────────────
+setInterval(() => {
+  actualizarEstados();
+}, 60000);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // INIT — punto de entrada
 // ─────────────────────────────────────────────────────────────────────────────
 (async () => {
@@ -1375,6 +1530,7 @@ themeToggle.addEventListener('click', () => {
   setupTablaEvents('devBody');
   setupAutocomplete('artBody', 'art');
   setupAutocomplete('devBody', 'dev');
+  setTipoOperacionSeleccionado('instalacion');
 
   // Cargar config guardada o usar default
   const cfgGuardada = cargarCfg();

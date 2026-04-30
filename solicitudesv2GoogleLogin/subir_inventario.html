@@ -83,20 +83,15 @@ h1{font-family:var(--mono);font-size:14px;color:var(--accent);letter-spacing:.08
 <div class="card">
   <div class="card-title">① Credenciales Firebase</div>
   <div class="status-row"><div class="dot" id="fbDot"></div><span id="fbStatus">Sin conectar</span></div>
-  <div id="firebaseConfigForm" style="display:none">
-    <div class="grid2">
-      <div class="sf-field"><label>API Key</label><input id="apiKey" value="AIzaSyD4jVqJQd-jA9D6L7ZNneBcTMZ7zF3yShk" placeholder="AIzaSy..."></div>
-      <div class="sf-field"><label>Auth Domain</label><input id="authDomain" value="solicitudes-f2ce8.firebaseapp.com" placeholder="proyecto.firebaseapp.com"></div>
-      <div class="sf-field"><label>Project ID</label><input id="projectId" value="solicitudes-f2ce8" placeholder="mi-proyecto"></div>
-      <div class="sf-field"><label>Storage Bucket</label><input id="storageBucket" value="solicitudes-f2ce8.firebasestorage.app" placeholder="proyecto.appspot.com"></div>
-      <div class="sf-field"><label>Messaging Sender ID</label><input id="messagingSenderId" value="1011786962364" placeholder="1234567890"></div>
-      <div class="sf-field"><label>App ID</label><input id="appId" value="1:1011786962364:web:ce2360a3a8b6b2ae1887b9" placeholder="1:123:web:abc..."></div>
-      <div class="sf-field"><label>Measurement ID</label><input id="measurementId" value="G-8DZPBS3WQ8" placeholder="G-XXXXXXXX"></div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:4px">
-      <button class="btn btn-primary" id="btnConectar">Conectar</button>
-      <button class="btn btn-ghost" id="btnCargarConfig">Cargar config guardada</button>
-    </div>
+  <div class="grid2">
+    <div class="sf-field"><label>API Key</label><input id="apiKey" placeholder="AIzaSy..."></div>
+    <div class="sf-field"><label>Auth Domain</label><input id="authDomain" placeholder="proyecto.firebaseapp.com"></div>
+    <div class="sf-field"><label>Project ID</label><input id="projectId" placeholder="mi-proyecto"></div>
+    <div class="sf-field"><label>App ID</label><input id="appId" placeholder="1:123:web:abc..."></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:4px">
+    <button class="btn btn-primary" id="btnConectar">Conectar</button>
+    <button class="btn btn-ghost" id="btnCargarConfig">Cargar config guardada</button>
   </div>
 </div>
 
@@ -121,10 +116,6 @@ h1{font-family:var(--mono);font-size:14px;color:var(--accent);letter-spacing:.08
         <label>Columna → Descripcion</label>
         <select id="colDesc"></select>
       </div>
-      <div>
-        <label>Columna → Cant (existencia)</label>
-        <select id="colCant"></select>
-      </div>
     </div>
     <button class="btn btn-ghost" id="btnActualizarPreview" style="margin-top:10px;font-size:12px;padding:6px 12px">Actualizar vista previa</button>
   </div>
@@ -136,7 +127,7 @@ h1{font-family:var(--mono);font-size:14px;color:var(--accent);letter-spacing:.08
     </div>
     <div class="scroll-wrap">
       <table class="preview-table">
-        <thead><tr><th>ID / Código</th><th>Descripcion</th><th>Cant</th></tr></thead>
+        <thead><tr><th>ID / Código</th><th>Descripcion</th></tr></thead>
         <tbody id="previewBody"></tbody>
       </table>
     </div>
@@ -170,58 +161,11 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const CFG_KEY = 'fb_sol_v3';
-const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyD4jVqJQd-jA9D6L7ZNneBcTMZ7zF3yShk',
-  authDomain: 'solicitudes-f2ce8.firebaseapp.com',
-  projectId: 'solicitudes-f2ce8',
-  storageBucket: 'solicitudes-f2ce8.firebasestorage.app',
-  messagingSenderId: '1011786962364',
-  appId: '1:1011786962364:web:ce2360a3a8b6b2ae1887b9',
-  measurementId: 'G-8DZPBS3WQ8'
-};
 const INV_COL = 'inventario';
 
 let db = null;
 let parsedData = [];
 let headers    = [];
-
-function aplicarConfigFirebasePorDefecto() {
-  document.getElementById('apiKey').value = DEFAULT_FIREBASE_CONFIG.apiKey;
-  document.getElementById('authDomain').value = DEFAULT_FIREBASE_CONFIG.authDomain;
-  document.getElementById('projectId').value = DEFAULT_FIREBASE_CONFIG.projectId;
-  document.getElementById('storageBucket').value = DEFAULT_FIREBASE_CONFIG.storageBucket;
-  document.getElementById('messagingSenderId').value = DEFAULT_FIREBASE_CONFIG.messagingSenderId;
-  document.getElementById('appId').value = DEFAULT_FIREBASE_CONFIG.appId;
-  document.getElementById('measurementId').value = DEFAULT_FIREBASE_CONFIG.measurementId;
-}
-
-async function conectarFirebase() {
-  const cfg = {
-    apiKey:          DEFAULT_FIREBASE_CONFIG.apiKey,
-    authDomain:      DEFAULT_FIREBASE_CONFIG.authDomain,
-    projectId:       DEFAULT_FIREBASE_CONFIG.projectId,
-    storageBucket:   DEFAULT_FIREBASE_CONFIG.storageBucket,
-    messagingSenderId: DEFAULT_FIREBASE_CONFIG.messagingSenderId,
-    appId:           DEFAULT_FIREBASE_CONFIG.appId,
-    measurementId:   DEFAULT_FIREBASE_CONFIG.measurementId,
-  };
-  try {
-    const app = getApps().length ? getApp() : initializeApp(cfg);
-    db = getFirestore(app);
-    await getDocs(collection(db, '_ping_test_'));
-    setFbStatus(true, 'Conectado automáticamente a ' + cfg.projectId);
-  } catch (e) {
-    if (e.code === 'permission-denied' || e.code?.includes('permission')) {
-      setFbStatus(true, 'Conectado automáticamente (permisos normales)');
-    } else {
-      setFbStatus(false, 'Error al conectar automáticamente: ' + e.message);
-    }
-  }
-  actualizarBotones();
-}
-
-aplicarConfigFirebasePorDefecto();
-conectarFirebase();
 
 // ── Cargar config guardada ──────────────────────────────────────────────────
 function cargarCfgGuardada() {
@@ -231,26 +175,20 @@ function cargarCfgGuardada() {
 document.getElementById('btnCargarConfig').addEventListener('click', () => {
   const c = cargarCfgGuardada();
   if (!c) { alert('No hay configuración guardada. Ingresa los datos manualmente.'); return; }
-  document.getElementById('apiKey').value          = c.apiKey          || '';
-  document.getElementById('authDomain').value      = c.authDomain      || '';
-  document.getElementById('projectId').value       = c.projectId       || '';
-  document.getElementById('storageBucket').value   = c.storageBucket   || '';
-  document.getElementById('messagingSenderId').value = c.messagingSenderId || '';
-  document.getElementById('appId').value           = c.appId           || '';
-  document.getElementById('measurementId').value   = c.measurementId   || '';
+  document.getElementById('apiKey').value     = c.apiKey     || '';
+  document.getElementById('authDomain').value = c.authDomain || '';
+  document.getElementById('projectId').value  = c.projectId  || '';
+  document.getElementById('appId').value      = c.appId      || '';
   log('Config cargada desde almacenamiento local');
 });
 
 // ── Conectar Firebase ───────────────────────────────────────────────────────
 document.getElementById('btnConectar').addEventListener('click', async () => {
   const cfg = {
-    apiKey:          document.getElementById('apiKey').value.trim(),
-    authDomain:      document.getElementById('authDomain').value.trim(),
-    projectId:       document.getElementById('projectId').value.trim(),
-    storageBucket:   document.getElementById('storageBucket').value.trim(),
-    messagingSenderId: document.getElementById('messagingSenderId').value.trim(),
-    appId:           document.getElementById('appId').value.trim(),
-    measurementId:   document.getElementById('measurementId').value.trim(),
+    apiKey:     document.getElementById('apiKey').value.trim(),
+    authDomain: document.getElementById('authDomain').value.trim(),
+    projectId:  document.getElementById('projectId').value.trim(),
+    appId:      document.getElementById('appId').value.trim(),
   };
   if (!cfg.apiKey || !cfg.projectId) { alert('Completa al menos API Key y Project ID'); return; }
   try {
@@ -305,9 +243,8 @@ function procesarArchivo(file) {
     // Auto-detectar columnas
     const guessId   = headers.findIndex(h => /^id$|código|codigo|^id\s*\//i.test(h));
     const guessDesc = headers.findIndex(h => /desc/i.test(h));
-    const guessCant = headers.findIndex(h => /^cant$|cantidad|existencia|stock/i.test(h));
 
-    llenarSelectores(headers, guessId >= 0 ? guessId : 0, guessDesc >= 0 ? guessDesc : 1, guessCant >= 0 ? guessCant : 2);
+    llenarSelectores(headers, guessId >= 0 ? guessId : 0, guessDesc >= 0 ? guessDesc : 1);
     parsedData = dataRows;
 
     document.getElementById('colMapWrap').style.display = 'block';
@@ -318,18 +255,16 @@ function procesarArchivo(file) {
   reader.readAsBinaryString(file);
 }
 
-function llenarSelectores(hdrs, idxId, idxDesc, idxCant) {
+function llenarSelectores(hdrs, idxId, idxDesc) {
   const selId   = document.getElementById('colId');
   const selDesc = document.getElementById('colDesc');
-  const selCant = document.getElementById('colCant');
-  [selId, selDesc, selCant].forEach(sel => {
+  [selId, selDesc].forEach(sel => {
     sel.innerHTML = hdrs.map((h, i) =>
       `<option value="${i}">${h || '(columna ' + (i+1) + ')'}</option>`
     ).join('');
   });
   selId.value   = idxId;
   selDesc.value = idxDesc;
-  selCant.value = idxCant;
 }
 
 document.getElementById('btnActualizarPreview').addEventListener('click', actualizarPreview);
@@ -337,12 +272,11 @@ document.getElementById('btnActualizarPreview').addEventListener('click', actual
 function actualizarPreview() {
   const idxId   = parseInt(document.getElementById('colId').value);
   const idxDesc = parseInt(document.getElementById('colDesc').value);
-  const idxCant = parseInt(document.getElementById('colCant').value);
 
   const preview = parsedData.slice(0, 10);
   const tbody   = document.getElementById('previewBody');
   tbody.innerHTML = preview.map(r =>
-    `<tr><td>${esc(r[idxId])}</td><td>${esc(r[idxDesc])}</td><td>${esc(r[idxCant])}</td></tr>`
+    `<tr><td>${esc(r[idxId])}</td><td>${esc(r[idxDesc])}</td></tr>`
   ).join('');
 
   document.getElementById('totalRows').textContent = parsedData.length;
@@ -360,14 +294,9 @@ async function subirDatos(borrarPrimero) {
 
   const idxId   = parseInt(document.getElementById('colId').value);
   const idxDesc = parseInt(document.getElementById('colDesc').value);
-  const idxCant = parseInt(document.getElementById('colCant').value);
 
   const registros = parsedData
-    .map(r => ({
-      ID: String(r[idxId]||'').trim(),
-      Descripcion: String(r[idxDesc]||'').trim(),
-      Cant: Number(r[idxCant]) || 0
-    }))
+    .map(r => ({ ID: String(r[idxId]||'').trim(), Descripcion: String(r[idxDesc]||'').trim() }))
     .filter(r => r.ID || r.Descripcion);
 
   if (!registros.length) { alert('No hay datos válidos para subir'); return; }

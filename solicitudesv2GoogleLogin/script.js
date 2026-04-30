@@ -6,12 +6,13 @@ import { initializeApp, getApps, getApp }
 
 import {
   getFirestore, collection, addDoc, getDocs,
-  deleteDoc, doc, getDoc, updateDoc, serverTimestamp, query, orderBy, where, limit
+  deleteDoc, doc, getDoc, updateDoc, serverTimestamp, query, orderBy, where, limit, setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
-  signOut, setPersistence, browserLocalPersistence, sendPasswordResetEmail
+  signOut, setPersistence, browserLocalPersistence,
+  GoogleAuthProvider, signInWithPopup
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,10 +39,6 @@ let currentRole  = 'user';
 let registros    = [];
 let registrosFiltrados = [];
 let articulosData = [{codigo:'', descripcion:'', serial:''}];
-let loginAttempts = 0;
-let loginLocked = false;
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOGIN_LOCK_MS = 15 * 60 * 1000; // 15 minutos
 let devuelveData  = [{id:'', detalle:'', numeroSerie:''}];
 let registrosParsed = [];
 let firebaseReady = false;
@@ -50,10 +47,6 @@ let originalData = null; // Datos originales para comparar cambios
 let inventarioDB = [];       // Cache local del inventario
 let inventarioCargado = false;
 const INVENTARIO_COL = 'inventario'; // colección Firebase con ID/Código y Descripcion
-
-// BUSCADOR GLOBAL
-let filaActiva = null;  // Referencia a la fila activa (artículo o devolución)
-let equipamientoDB = []; // Cache de equipamiento para búsqueda global
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UTILS
@@ -94,50 +87,6 @@ function formatLogFecha(ts) {
   } catch(e) { return '—'; }
 }
 
-function copiarAlPortapapeles(texto) {
-  // Intenta con Clipboard API (moderno, HTTPS)
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    return navigator.clipboard.writeText(texto)
-      .then(() => {
-        toast('Copiado al portapapeles');
-        return true;
-      })
-      .catch(() => copiarAlPortapapelesFallback(texto));
-  } else {
-    // Fallback para navegadores antiguos o HTTP
-    return copiarAlPortapapelesFallback(texto);
-  }
-}
-
-function copiarAlPortapapelesFallback(texto) {
-  try {
-    // Crear un textarea temporal
-    const textarea = document.createElement('textarea');
-    textarea.value = texto;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    textarea.style.pointerEvents = 'none';
-    document.body.appendChild(textarea);
-    
-    // Seleccionar y copiar
-    textarea.select();
-    textarea.setSelectionRange(0, 99999); // Para móviles
-    const exitoso = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    
-    if (exitoso) {
-      toast('Copiado al portapapeles');
-      return Promise.resolve(true);
-    } else {
-      toast('Error al copiar', 'error');
-      return Promise.reject();
-    }
-  } catch (e) {
-    toast('Error al copiar: ' + e.message, 'error');
-    return Promise.reject(e);
-  }
-}
-
 function registrarLog(accion, detalle, changedFields = []) {
   if (!db || !currentUser) return;
 
@@ -149,140 +98,6 @@ function registrarLog(accion, detalle, changedFields = []) {
     changedFields,
     fecha: serverTimestamp()
   }).catch(error => console.error('Error log:', error));
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BUSCADOR GLOBAL DE EQUIPAMIENTO
-// ─────────────────────────────────────────────────────────────────────────────
-async function cargarEquipamientoGlobal() {
-  if (equipamientoDB.length > 0 || !db) return; // Ya cargado
-  try {
-    const snap = await getDocs(collection(db, INVENTARIO_COL));
-    equipamientoDB = snap.docs.map(d => {
-      const data = d.data();
-      return {
-        id:      data.ID || data.codigo || d.id || '',
-        detalle: data.Descripcion || data.descripcion || '',
-        cant:    Number(data.Cant ?? data.cant ?? data.Cantidad ?? data.cantidad ?? 0) || 0
-      };
-    });
-    console.log('[Equipamiento Global] Cargados', equipamientoDB.length, 'items');
-  } catch(e) {
-    console.warn('No se pudo cargar equipamiento global:', e.message);
-  }
-}
-
-function buscarEquipamientoGlobal(search) {
-  const q = search.toLowerCase();
-  return equipamientoDB.filter(item =>
-    (item.id && item.id.toLowerCase().includes(q)) ||
-    (item.detalle && item.detalle.toLowerCase().includes(q))
-  ).slice(0, 15);
-}
-
-function completarEnTabla(item, tablaTipo) {
-  // Agregar nueva fila a la tabla correspondiente
-  if (tablaTipo === 'art') {
-    articulosData.push({codigo: item.id, descripcion: item.detalle, serial: ''});
-    renderArticulos();
-    setupAutocomplete('artBody', 'art');
-  } else if (tablaTipo === 'dev') {
-    devuelveData.push({id: item.id, detalle: item.detalle, numeroSerie: ''});
-    renderDevuelve();
-    setupAutocomplete('devBody', 'dev');
-  }
-
-  // Limpiar búsqueda
-  document.getElementById('busquedaGlobal').value = '';
-  document.getElementById('resultadosBusqueda').innerHTML = '';
-  document.getElementById('resultadosBusqueda').style.display = 'none';
-}
-
-function renderResultadosBusqueda(lista) {
-  const resultadosDiv = document.getElementById('resultadosBusqueda');
-  resultadosDiv.innerHTML = '';
-
-  if (!lista.length) {
-    resultadosDiv.innerHTML = '<div style="padding:10px;color:var(--text-dim);text-align:center">Sin coincidencias</div>';
-    resultadosDiv.style.display = 'block';
-    return;
-  }
-
-  lista.forEach(item => {
-    const div = document.createElement('div');
-    div.style.cssText = 'padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;transition:background 0.2s';
-    div.classList.add('resultado-equipo');
-
-    const contenido = document.createElement('div');
-    contenido.style.cssText = 'flex:1;display:flex;align-items:center;gap:8px';
-    contenido.innerHTML = `<strong>${esc(item.id)}</strong> — ${esc(item.detalle)}`;
-
-    if (item.cant >= 1) {
-      const qty = document.createElement('span');
-      qty.style.cssText = 'background:var(--success);color:#0f172a;padding:2px 6px;border-radius:10px;font-size:11px;font-weight:600;margin-left:8px';
-      qty.textContent = `Disponible: ${item.cant}`;
-      contenido.appendChild(qty);
-    }
-
-    const botones = document.createElement('div');
-    botones.style.cssText = 'display:flex;gap:6px;margin-left:8px';
-
-    const btnSolicitud = document.createElement('button');
-    btnSolicitud.textContent = 'Solicitud';
-    btnSolicitud.style.cssText = 'padding:4px 8px;font-size:11px;background:var(--accent);color:white;border:1px solid var(--accent);border-radius:3px;cursor:pointer;white-space:nowrap;transition:all 0.2s';
-    btnSolicitud.addEventListener('mouseenter', () => {
-      btnSolicitud.style.background = '#6fa3fa';
-    });
-    btnSolicitud.addEventListener('mouseleave', () => {
-      btnSolicitud.style.background = 'var(--accent)';
-    });
-
-    btnSolicitud.addEventListener('click', (e) => {
-      e.stopPropagation();
-      completarEnTabla(item, 'art');
-      toast('Agregado a Solicitud', 'success');
-    });
-
-    const btnDevolucion = document.createElement('button');
-    btnDevolucion.textContent = 'Devolución';
-    btnDevolucion.style.cssText = 'padding:4px 8px;font-size:11px;background:var(--warning);color:#0f172a;border:1px solid var(--warning);border-radius:3px;cursor:pointer;white-space:nowrap;transition:all 0.2s';
-    btnDevolucion.addEventListener('mouseenter', () => {
-      btnDevolucion.style.background = '#f7c84f';
-    });
-    btnDevolucion.addEventListener('mouseleave', () => {
-      btnDevolucion.style.background = 'var(--warning)';
-    });
-
-    btnDevolucion.addEventListener('click', (e) => {
-      e.stopPropagation();
-      completarEnTabla(item, 'dev');
-      toast('Agregado a Devolución', 'success');
-    });
-
-    botones.appendChild(btnSolicitud);
-    botones.appendChild(btnDevolucion);
-
-    div.addEventListener('mouseenter', () => {
-      div.style.background = 'var(--bg-secondary)';
-    });
-    div.addEventListener('mouseleave', () => {
-      div.style.background = 'transparent';
-    });
-
-    div.appendChild(contenido);
-    div.appendChild(botones);
-    resultadosDiv.appendChild(div);
-  });
-
-  resultadosDiv.style.display = 'block';
-}
-
-function debounceSearch(fn, delay = 300) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
 }
 
 function esc(s) {
@@ -298,7 +113,7 @@ function autoH(el) {
 // FIREBASE — inicialización única y segura
 // ─────────────────────────────────────────────────────────────────────────────
 function cargarCfg() {
-  try { return JSON.parse(sessionStorage.getItem(CFG_KEY)); } catch(e) { return null; }
+  try { return JSON.parse(localStorage.getItem(CFG_KEY)); } catch(e) { return null; }
 }
 
 function poblarCfgUI(c) {
@@ -327,11 +142,12 @@ async function inicializarFirebase(cfg) {
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         currentUser = user;
+        // Asegurar que el usuario existe en Firestore
+        await asegurarUsuarioFirestore(user, db);
         await cargarRol(user.uid);
         mostrarApp();
         await cargarRegistros();
         await cargarInventario(); // precargar inventario para autocomplete
-        await cargarEquipamientoGlobal(); // precargar equipamiento para buscador global
       } else {
         currentUser = null;
         currentRole = 'user';
@@ -356,6 +172,34 @@ async function inicializarFirebase(cfg) {
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH — control de UI basado en onAuthStateChanged
 // ─────────────────────────────────────────────────────────────────────────────
+async function asegurarUsuarioFirestore(user, db) {
+  if (!user || !db) return;
+  try {
+    const userRef = doc(db, 'usuarios', user.uid);
+    const userSnap = await getDoc(userRef);
+    
+    // Si el usuario no existe, crear documento con rol 'user' por defecto
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        email: user.email || '',
+        nombre: user.displayName || 'Usuario',
+        rol: 'user',
+        activo: true,
+        proveedor: user.providerData?.[0]?.providerId || 'email',
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+    } else {
+      // Si existe, actualizar lastLogin
+      await updateDoc(userRef, {
+        lastLogin: serverTimestamp()
+      }).catch(() => {}); // Ignorar errores si no tiene permisos
+    }
+  } catch(e) {
+    console.error('[AUTH] Error al asegurar usuario:', e);
+  }
+}
+
 function mostrarLogin() {
   document.getElementById('loginView').style.display  = 'flex';
   document.getElementById('appShell').style.display   = 'none';
@@ -366,8 +210,6 @@ function mostrarApp() {
   document.getElementById('loginView').style.display = 'none';
   document.getElementById('appShell').style.display  = 'block';
   document.getElementById('topbarUser').textContent  = currentUser ? currentUser.email : '';
-  // Actualizar campo de creador
-  document.getElementById('fCreador').value = currentUser ? currentUser.email : '';
 }
 
 async function cargarRol(uid) {
@@ -395,7 +237,6 @@ function aplicarPermisosUI() {
 // LOGIN
 document.getElementById('loginBtn').addEventListener('click', async () => {
   if (!firebaseReady) { toast('Firebase no está listo aún', 'error'); return; }
-  if (loginLocked) { errEl.textContent = 'Demasiados intentos. Intenta más tarde.'; return; }
   const email = document.getElementById('loginEmail').value.trim();
   const pass  = document.getElementById('loginPass').value;
   const errEl = document.getElementById('loginError');
@@ -408,20 +249,9 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   btn.textContent = 'Ingresando...';
   try {
     await signInWithEmailAndPassword(auth, email, pass);
-    loginAttempts = 0;
     // onAuthStateChanged se encarga de mostrar la app automáticamente
   } catch(e) {
-    loginAttempts += 1;
-    if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
-      loginLocked = true;
-      setTimeout(() => {
-        loginLocked = false;
-        loginAttempts = 0;
-      }, LOGIN_LOCK_MS);
-      errEl.textContent = 'Se ha bloqueado el acceso. Intenta de nuevo más tarde.';
-    } else {
-      errEl.textContent = 'Credenciales incorrectas';
-    }
+    errEl.textContent = 'Credenciales incorrectas';
     btn.disabled = false;
     btn.textContent = 'Ingresar';
   }
@@ -434,32 +264,45 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   });
 });
 
-// CAMBIAR CONTRASEÑA
-document.getElementById('btnResetPassword').addEventListener('click', async () => {
+// GOOGLE LOGIN
+document.getElementById('btnGoogleLogin').addEventListener('click', async () => {
+  if (!firebaseReady) { 
+    toast('Firebase no está listo aún', 'error'); 
+    return; 
+  }
+  
+  const btn = document.getElementById('btnGoogleLogin');
+  const errEl = document.getElementById('loginError');
+  
+  btn.disabled = true;
+  btn.textContent = 'Conectando...';
+  errEl.textContent = '';
+  
   try {
-    const user = auth?.currentUser;
-    const typedEmail = document.getElementById('loginEmail')?.value?.trim();
-    const email = user?.email || typedEmail;
-
-    if (!auth) {
-      console.warn('[ResetPassword] auth no inicializado');
-      toast('Firebase aún no está listo. Recarga la página y vuelve a intentar.', 'error');
-      return;
-    }
-
-    if (!email) {
-      toast('No se encontró correo para restablecer. Ingresa tu email en el login.', 'error');
-      return;
-    }
-
-    await sendPasswordResetEmail(auth, email);
-    console.log('[ResetPassword] Solicitud enviada para', email);
-    toast('Correo de restablecimiento enviado a ' + email, 'success');
+    const provider = new GoogleAuthProvider();
+    // Solicitar email verificado
+    provider.setCustomParameters({ prompt: 'select_account' });
+    
+    const result = await signInWithPopup(auth, provider);
+    // onAuthStateChanged se encarga de mostrar la app automáticamente
   } catch(e) {
-    console.error('[ResetPassword] error:', e);
-    const code = e.code || 'unknown';
-    const message = e.message || 'No se pudo enviar el correo';
-    toast('Error (' + code + '): ' + message, 'error');
+    console.error('[GOOGLE LOGIN] Error:', e);
+    // Manejar errores específicos
+    if (e.code === 'auth/popup-blocked') {
+      errEl.textContent = 'Popup bloqueado. Permite popups en el navegador.';
+    } else if (e.code === 'auth/popup-closed-by-user') {
+      errEl.textContent = 'Proceso cancelado.';
+      btn.disabled = false;
+      btn.textContent = 'Iniciar con Google';
+    } else if (e.code === 'auth/cancelled-popup-request') {
+      // Usuario cerró sin completar, no mostrar error
+      btn.disabled = false;
+      btn.textContent = 'Iniciar con Google';
+    } else {
+      errEl.textContent = 'Error al iniciar sesión: ' + e.message;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Iniciar con Google';
   }
 });
 
@@ -716,51 +559,6 @@ function cerrarDropdown(idx, tableType, field = null) {
   if (drop) drop.classList.remove('open');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LISTENERS BUSCADOR GLOBAL
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Detectar fila activa al hacer focus en cualquier input de tabla
-document.addEventListener('focusin', (e) => {
-  const tr = e.target.closest('tr[data-tabla]');
-  if (tr) {
-    filaActiva = tr;
-    console.log('[BuscadorGlobal] Fila activa:', filaActiva.dataset.tabla, 'índice:', filaActiva.dataset.idx);
-  }
-});
-
-// Búsqueda con debounce
-const inputBusqueda = document.getElementById('busquedaGlobal');
-const debouncedSearch = debounceSearch(async (valor) => {
-  if (valor.length < 2) {
-    document.getElementById('resultadosBusqueda').innerHTML = '';
-    document.getElementById('resultadosBusqueda').style.display = 'none';
-    return;
-  }
-
-  // Cargar equipamiento si no está listo
-  if (equipamientoDB.length === 0) {
-    await cargarEquipamientoGlobal();
-  }
-
-  const resultados = buscarEquipamientoGlobal(valor);
-  renderResultadosBusqueda(resultados);
-}, 300);
-
-inputBusqueda.addEventListener('input', (e) => {
-  const valor = e.target.value.trim().toLowerCase();
-  debouncedSearch(valor);
-});
-
-// Limpiar búsqueda
-document.getElementById('btnLimpiarBusqueda').addEventListener('click', () => {
-  document.getElementById('busquedaGlobal').value = '';
-  document.getElementById('resultadosBusqueda').innerHTML = '';
-  document.getElementById('resultadosBusqueda').style.display = 'none';
-  filaActiva = null;
-  inputBusqueda.focus();
-});
-
 document.getElementById('btnAgregarArticulo').addEventListener('click', () => {
   const last = articulosData[articulosData.length - 1];
   if (!last.codigo && !last.descripcion) { toast('Completa el artículo antes de agregar otro', 'info'); return; }
@@ -784,7 +582,6 @@ function limpiarFormulario() {
   ['fSolicitud','fDevolucion','fUsuario','fDireccion','fBcs','fSci','fObs'].forEach(id => {
     document.getElementById(id).value = '';
   });
-  // El creador se mantiene igual (es el usuario logueado)
   articulosData = [{codigo:'', descripcion:'', serial:''}];
   devuelveData  = [{id:'', detalle:'', numeroSerie:''}];
   editandoId = null;
@@ -821,7 +618,9 @@ document.getElementById('btnCopiar').addEventListener('click', () => {
       texto += `- ${d.id || '—'} - ${d.detalle || '—'} - ${d.numeroSerie || '—'}\n`;
   });
 
-  copiarAlPortapapeles(texto);
+  navigator.clipboard.writeText(texto)
+    .then(() => toast('Resumen copiado'))
+    .catch(() => toast('Error al copiar', 'error'));
 });
 
 document.getElementById('btnGuardar').addEventListener('click', async () => {
@@ -839,7 +638,6 @@ document.getElementById('btnGuardar').addEventListener('click', async () => {
     solicitud:     sol,
     devolucion:    document.getElementById('fDevolucion').value.trim(),
     usuario:       usr,
-    creador:       document.getElementById('fCreador').value.trim(),
     direccion:     document.getElementById('fDireccion').value.trim(),
     bcs:           document.getElementById('fBcs').value.trim(),
     sci:           document.getElementById('fSci').value.trim(),
@@ -856,7 +654,7 @@ document.getElementById('btnGuardar').addEventListener('click', async () => {
       // MODO EDICIÓN — actualizar documento existente, conservar fecha original
       await updateDoc(doc(db, coleccion, editandoId), data);
       const changedFields = [];
-      const fieldsToCheck = ['solicitud', 'devolucion', 'usuario', 'creador', 'direccion', 'bcs', 'sci', 'observaciones', 'articulos', 'devuelve'];
+      const fieldsToCheck = ['solicitud', 'devolucion', 'usuario', 'direccion', 'bcs', 'sci', 'observaciones', 'articulos', 'devuelve'];
       fieldsToCheck.forEach(field => {
         if (JSON.stringify(data[field]) !== JSON.stringify(originalData[field])) {
           changedFields.push(field);
@@ -913,13 +711,12 @@ function filtrarRegistros() {
     const artsStr = (r.articulos||[]).map(a => `${a.codigo||''} ${a.descripcion||''} ${a.serial||''}`).join(' ').toLowerCase();
     const devStr  = (r.devuelve||[]).map(a => `${a.id||a.codigo||''} ${a.detalle||a.descripcion||''} ${a.numeroSerie||''}`).join(' ').toLowerCase();
     if (campo === 'all') {
-      return ['solicitud','devolucion','usuario','creador','bcs','sci','observaciones','direccion']
+      return ['solicitud','devolucion','usuario','bcs','sci','observaciones','direccion']
         .some(k => (r[k]||'').toLowerCase().includes(q)) || artsStr.includes(q) || devStr.includes(q);
     }
     if (campo === 'codigo')   return artsStr.includes(q);
     if (campo === 'serial')   return artsStr.includes(q);
     if (campo === 'devuelve') return devStr.includes(q);
-    if (campo === 'creador')  return (r.creador||'').toLowerCase().includes(q);
     return (r[campo]||'').toLowerCase().includes(q);
   });
   renderLista(registrosFiltrados);
@@ -966,7 +763,6 @@ function renderLista(lista) {
           <div class="det-field"><label>N° Solicitud</label><div class="det-val mono">${esc(r.solicitud||'—')}</div></div>
           <div class="det-field"><label>N° Devolución</label><div class="det-val mono">${esc(r.devolucion||'—')}</div></div>
           <div class="det-field"><label>Usuario</label><div class="det-val">${esc(r.usuario||'—')}</div></div>
-          <div class="det-field"><label>Creador</label><div class="det-val" style="color:var(--text-muted);font-size:12px;font-family:var(--mono)">${esc(r.creador||'—')}</div></div>
           <div class="det-field"><label>Fecha</label><div class="det-val" style="color:var(--text-muted)">${formatFecha(r.fecha)}</div></div>
           <div class="det-field" style="grid-column:1/-1"><label>Dirección</label><div class="det-val">${esc(r.direccion||'—')}</div></div>
           <div class="det-field"><label>BCS</label><div class="det-val mono">${esc(r.bcs||'—')}</div></div>
@@ -1045,7 +841,9 @@ function copiarRegistro(id) {
   const texto = generarTextoRegistro(id);
   if (!texto) return;
 
-  copiarAlPortapapeles(texto);
+  navigator.clipboard.writeText(texto)
+    .then(() => toast('Registro copiado al portapeles'))
+    .catch(() => toast('Error al copiar', 'error'));
 }
 
 function enviarCorreo(id) {
@@ -1154,9 +952,9 @@ document.getElementById('btnGuardarConfig').addEventListener('click', async () =
     coleccion:         document.getElementById('cfgColeccion').value.trim() || 'solicitudes'
   };
   if (!cfg.apiKey || !cfg.projectId) { toast('Completa API Key y Project ID', 'error'); return; }
-  sessionStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+  localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
   const ok = await inicializarFirebase(cfg);
-  if (ok) toast('Configuración guardada en sesión y conectado');
+  if (ok) toast('Configuración guardada y conectado');
 });
 
 document.getElementById('btnProbarConfig').addEventListener('click', () => {

@@ -927,10 +927,13 @@ function filtrarRegistros() {
 
 function renderLista(lista) {
   const el = document.getElementById('regList');
+  const headers = document.getElementById('regColHeaders');
   if (!lista.length) {
     el.innerHTML = `<div class="empty">${db ? 'Sin registros que mostrar' : 'Configura Firebase primero'}</div>`;
+    if (headers) headers.classList.add('oculto');
     return;
   }
+  if (headers) headers.classList.remove('oculto');
   el.innerHTML = '<div class="reg-list">' + lista.map(r => {
     const arts    = r.articulos || [];
     const devs    = r.devuelve  || [];

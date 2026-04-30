@@ -197,6 +197,34 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .sf-field input{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;transition:border-color .15s}
 .sf-field input:focus{border-color:var(--accent)}
 
+/* REGISTROS — column headers */
+.reg-col-headers{
+  display:grid;
+  grid-template-columns:110px 1fr 110px 110px auto;
+  align-items:center;
+  gap:12px;
+  padding:6px 14px;
+  margin-bottom:4px;
+  border-bottom:1px solid var(--border);
+}
+.reg-col-headers.oculto{
+  visibility:hidden;
+  pointer-events:none;
+}
+.reg-col-h{
+  font-family:var(--mono);
+  font-size:10px;
+  font-weight:500;
+  color:var(--text-dim);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+@media(max-width:600px){
+  .reg-col-headers{grid-template-columns:90px 1fr auto}
+  .reg-col-h--bcs,.reg-col-h--sci{display:none}
+}
+
 .empty{padding:40px;text-align:center;color:var(--text-dim);font-size:13px}
 code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:2px 6px;border-radius:4px;border:1px solid var(--border);color:var(--warning)}
 
@@ -224,14 +252,107 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:2px 6px
 /* Ocultar apartado Importar TXT */
 #view-importar { display: none; }
 .nav-tab[data-view="importar"] { display: none !important; }
-
-/* Ocultar contenido de carga de archivo TXT */
-#view-importar p:first-of-type { display: none; }
-#importFile { display: none; }
 .app-footer {
   position: fixed;
   bottom: 20px;
   right: 20px;
   opacity: 0.2;
   font-size: 10px;
+}
+
+/* Ocultar contenido de carga de archivo TXT */
+#view-importar p:first-of-type { display: none; }
+#importFile { display: none; }
+
+/* ── TIPO OPERACION (radios) ── */
+.tipo-op-row { align-items: center; }
+.tipo-op-radios {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 11px;
+  border-left: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.tipo-op-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.tipo-op-label input[type="radio"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tipo-op-clear {
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  margin-left: 4px;
+  font-family: var(--mono);
+  transition: color .15s;
+}
+.tipo-op-clear:hover { color: var(--danger); }
+
+/* ── COLORES DE PERMUTA EN REGISTROS ── */
+.reg-item.permuta-verde    { border-left: 4px solid #22c55e; }
+.reg-item.permuta-amarillo { border-left: 4px solid #f59e0b; }
+.reg-item.permuta-rojo     { border-left: 4px solid #ef4444; }
+
+/* ── BADGE TIMER PERMUTA ── */
+.permuta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.permuta-badge.verde    { background: #14532d; color: #4ade80; }
+.permuta-badge.amarillo { background: #78350f; color: #fcd34d; }
+.permuta-badge.rojo     { background: #450a0a; color: #f87171; }
+.light-mode .permuta-badge.verde    { background: #dcfce7; color: #15803d; }
+.light-mode .permuta-badge.amarillo { background: #fef3c7; color: #92400e; }
+.light-mode .permuta-badge.rojo     { background: #fee2e2; color: #b91c1c; }
+
+/* Bloque de detalle de permuta en reg-body */
+.permuta-detail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--r);
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.permuta-detail.verde    { border-color: #22c55e33; background: #14532d22; }
+.permuta-detail.amarillo { border-color: #f59e0b33; background: #78350f22; }
+.permuta-detail.rojo     { border-color: #ef444433; background: #450a0a22; }
+
+/* ── REGISTRO COLORES ── */
+.reg-item.verde { border-left: 4px solid #22c55e; }
+.reg-item.amarillo { border-left: 4px solid #f59e0b; }
+.reg-item.rojo { border-left: 4px solid #ef4444; }
+
+/* ── TEXTAREA OBSERVACIONES ── */
+.frow textarea {
+  resize: vertical;
+  min-height: 60px;
+  line-height: 1.4;
+  font-family: var(--sans);
+  font-size: 13px;
 }
